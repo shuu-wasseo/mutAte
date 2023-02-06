@@ -1,0 +1,20 @@
+{
+    "uid": {
+        "level": 0,
+        "prestige": 0,
+        "totalpeople": 0,
+        "population": [
+            {
+                "serial": 1,
+                "parents": [0, 0],
+                "genes": "ZZ"
+            },
+            {
+                "serial": 2,
+                "parents": [0, 0],
+                "genes": "ZZ"
+            }
+        ],
+        "hatchery": []
+    }
+}
