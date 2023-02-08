@@ -1,8 +1,6 @@
 # bot.py
 
 # mini checklist for me
-# - mutation indicator 
-# - further point system maybe
 # - something to do with the people you killed off
 
 # load discord
@@ -73,9 +71,10 @@ class person:
             return f"person {self.serial}: genes {self.genes} (first gen)"
 
 class egg(person):
-    def __init__(self, serial, parents, hatchtime, genes = ""):
+    def __init__(self, serial, parents, hatchtime, genes = "", mutation = 0):
         super().__init__(serial, parents, genes)
         self.hatchtime = hatchtime
+        self.mutation = mutation
 
 # embeds
 class error_embed(discord.Embed):
@@ -96,6 +95,7 @@ class hatcheryview(discord.ui.View):
         if interaction.user.id == self.id:
             data = imdata(id=self.id)
             collected = 0 
+            ncoins = 0
             collectembed = discord.Embed(title="collection complete!")
             new = [] 
 
@@ -104,17 +104,19 @@ class hatcheryview(discord.ui.View):
                     data["population"].append(person(egg["serial"], egg["parents"], genes=egg["genes"]))
                     collectembed.add_field(name=f'person {egg["serial"]} {egg["genes"]}', value=f'parents: {", ".join([str(x) for x in egg["parents"]])}')
                     collected += 1
+                    ncoins += sum([26-value(g) for g in egg["genes"]])
                     if egg["genes"] not in data["discovered"]:
                         data["discovered"].append(egg["genes"])
                         new.append(egg["genes"])
 
-            collectembed.description = f"you collected {collected} eggs.\n" + ("new combos:" + str(new)[1:-1] if len(new) != 0 else "no new combos found.")
+            collectembed.description = f"you collected {collected} eggs and got {ncoins} coins.\n" + ("new combos:" + str(new)[1:-1] if len(new) != 0 else "no new combos found.")
             data["totalpeople"] += collected
             initlevel = data["level"]
             while (data["level"] + 1) * (data["level"] + 2) / 2 <= len(data["discovered"]):
                 data["level"] += 1
             data["hatchery"] = [egg for egg in data["hatchery"] if get(egg["hatchtime"]) >= arrow.Arrow.now()]
             data["lastegg"] = arrow.Arrow.now()
+            data["coins"] += ncoins
             await interaction.response.send_message(embed=collectembed)
             exdata(data, id=self.id)
             if data["level"] != initlevel:
@@ -157,6 +159,7 @@ def evolchance(gene):
 
 def newgenes(gene1, gene2):
     genes = ""
+    mutation = []
     for x in range(2):
         chance = random()
         if chance < 0.5:
@@ -168,12 +171,14 @@ def newgenes(gene1, gene2):
             genes += alpha[max(alpha.index(inherit.upper())-1, 0)]
         else:
             genes += inherit
-    return genes
+        mutation.append(chance < evolchance(inherit)/2)
+    return genes, mutation.count(True)
 
 # constants
 alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 initdata = {
     "level": 1,
+    "coins": 4,
     "prestige": 0,
     "totalpeople": 2,
     "discovered": ["ZZ"],
@@ -195,7 +200,7 @@ initdata = {
             "serial": 3,
             "parents": [1, 2],
             "hatchtime": arrow.Arrow.now(),
-            "genes": newgenes("ZZ", "ZZ")
+            "genes": newgenes("ZZ", "ZZ")[0]
         }
     ],
     "profile": {
@@ -257,7 +262,8 @@ async def hatchery(interaction):
 
     while len(hatchery) < limit + 1:
         parents = sample(population, 2)
-        hatchery.append(egg(len(population)+len(hatchery)+1, list(sorted([p.serial for p in parents])), nextegg, genes=newgenes(*[p.genes for p in parents])))
+        genes = newgenes(*[p.genes for p in parents])
+        hatchery.append(egg(len(population)+len(hatchery)+1, list(sorted([p.serial for p in parents])), nextegg, genes=genes[0], mutation=genes[1]))
         nextegg += timedelta(seconds=10*limit)
 
     nextegg = arrow.Arrow.now()
@@ -271,8 +277,8 @@ async def hatchery(interaction):
         try:
             e = hatchery[x]
             embed.add_field(
-                name=f"slot {x+1}" + " **(HATCHED)**" if e.hatchtime < arrow.Arrow.now() else "", 
-                value=f"**person {e.serial}**\nparents: {e.parents[0]}, {e.parents[1]}\nhatching {format_timestamp(e.hatchtime, TimestampType.RELATIVE)}"
+                name=f"slot {x+1}" + " (HATCHED)" if e.hatchtime < arrow.Arrow.now() else "", 
+                value=f"**person {e.serial}\n{e.mutation} mutations**\nparents: {e.parents[0]}, {e.parents[1]}\nhatching {format_timestamp(e.hatchtime, TimestampType.RELATIVE)}"
             )
         except:
             pass
