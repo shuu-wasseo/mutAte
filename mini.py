@@ -58,10 +58,13 @@ class fighter:
 
 # embeds
 class error_embed(discord.Embed):
-    def __init__(self, error):
+    def __init__(self, error, need=0):
         super().__init__()
         self.title = f"error! invalid {error}."
-        self.description = f"check `/help` to see if your {error.split()[-1]} is in the right format. otherwise, please join the support server here.\nhttps://discord.gg/GPfpUNmxPP"
+        if error == "coins":
+            self.description = f"you need {need} coins per egg."
+        else:
+            self.description = f"check `/help` to see if your {error.split()[-1]} is in the right format. otherwise, please join the support server here.\nhttps://discord.gg/GPfpUNmxPP"
         self.color = discord.Color.dark_red()
 
 # views
@@ -189,7 +192,105 @@ class afterlifestart(discord.ui.View):
                 fighterobj = battlefield[warrior]
                 embed.add_field(name=warrior, value=f"{fighterobj['genes']}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
             gdata = {"cemetery": cemetery, "enemies": enemies}
-            exdata(gdata, id=self.id, game=True) 
+            exdata(gdata, id=self.id, game=True)
+
+class helpdropdown(discord.ui.Select):
+    def __init__(self, msg = None):
+
+        # Set the options that will be presented inside the dropdown
+        options = [
+            discord.SelectOption(label="introduction", description="welcome to the game!"),
+            discord.SelectOption(label="commands", description="so how the hell do i use this bot"),
+            discord.SelectOption(label="numbers", description="crunching some numbers (for the curious people)"),
+            discord.SelectOption(label="afterlife", description="the dead people minigame")
+        ]
+
+        super().__init__(placeholder='saurr what do you need help with', min_values=1, max_values=1, options=options)
+        self.msg = msg
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        match self.values[0]:
+            case "introduction":
+                help = {
+                    "welcome to the game!\nthis game is about population control.": {
+                        "some background": "recently, scientists have found two people with special genes, and these genes have superhuman potential. as of today, these genes have been found to mutate up to 25 times beyond their original state. these 25 mutations will be referred to using the letters Y to A.",
+                        "aim of the game": "you start off with 2 people with ZZ genes. your goal is to, through population control, finally have one person with AA genes."
+                    },
+                    "how do i get someone with AA genes?\nthere are a few ways!": {
+                        "reproduction": "your people are able to produce offspring! with every offspring, there is a tiny chance of each gene mutating! slowly, you'll get better and better genes.",
+                        "frickery": "if needed, you might be able to make two people procreate multiple babies! this is especially useful if you pick out people with the best genes as there is a higher chance that the genes of the babies will mutate!",
+                        "selection": "to allow a better gene pool, you may be allowed to kill off people with weaker genes to increase the general quality of your population's genes."
+                    },
+                    "but what about the dead people?\ndon't worry, you'll still get to see them": {
+                        "cemetery": "you can visit the cemetery to see how everyone is doing!",
+                        "afterlife minigame": "there's a little minigame involving the dead people as a quick send-off! :>"
+                    },
+                    "what kind of currency is there in this game?\nthere are two main types:": {
+                        "coins": "earned when a new baby is born\nused for **frickery**",
+                        "skullpoints": "earned when someone dies / in the afterlife minigame\nused for **upgrades**"
+                    },
+                    "what if my progression is too slow?\nyou can always buy upgrades from the upgrade shop using skullpoints!": {},
+                    "bonus tips\nyou'll probably need these, thank me later": {
+                        "lifespan": "the lifespan of your first few people will be generally very short, so make sure you're active especially in the first few days!",
+                        "upgrades": "these help a lot with the progression, especially in later stages when the population stops mutating so rapidly.",
+                        "afterlife": "the afterlife minigame gives you a lot of skullpoints and helps with the progression too.",
+                        "selection": "selection has a similar reward to afterlife, but it also boosts your hatchery (and thus your population) due to the better gene pool. so remember to do it regularly!"
+                    }
+                }
+            case "commands":
+                help = {
+                    "the main game\nsee your population and watch it expand": {
+                        "population": "view population (default: top 25 people in gene quality).\n\n`bottomfirst`: view reverse ranking\n`sort_by_serial`: rank by (low) serial instead\n`full`: see up to 250 people",
+                        "hatchery": "view your hatchery (shows all your eggs).\n\n`level + 1` slots in total\ngain 1 egg every `5 * level` minutes (without upgrades)"
+                    },
+                    "population control\nreally really really unnatural wae": {
+                        "frickery": "force two people to instantly procreate as many babies as you want (and can), for 5 * level coins per baby.\n\n`person1`, `person2`: the serial numbers of the two people who you would like to reproduce (or `max` to get the people with the best genes)\n`times`: number of times you would like the people to reproduce (or `max` for the maximum number of times)",
+                        "selection": "purge all people where both genes are a certain tier or below. only all people with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for people with both slots Z and below)\nyou will get one skullpoint per person killed.\n\n`gene`: all people with both genes with this tier or below will be killed."
+                    },
+                    "the dead people\nbecause we're not done with them yet!": {
+                        "cemetery": "just `/population` but for the dead people.",
+                        "afterlife": "starts the afterlife minigame."
+                    },
+                    "misc\nupgrades and profiles!": {
+                        "upgrade": "view and buy upgrades! the currency used here is skullpoints.",
+                        "me": "view your profile and some stats.",
+                        "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n'newvalue': the new url / bio"
+                    }
+                }
+            case "numbers":
+                help = {
+                    "the numbers!\nif you were curious.": {
+                        "base chance of mutation (%)": "25 for Z, 0 for A (-1 per tier)",
+                        "base time for egg to hatch (min) / frickery price (coins)": "5 * level",
+                        "value of person's genes": "1 for Z, 26 for A for each gene (+1 per tier)\n\nthis value affects the number of skullpoints gained upon death and in the afterlife minigame, and serves as the ranking for gene quality.",
+                        "lifespan (12 hours) / power (afterlife)": "value of left gene",
+                        "charisma / health (afterlife)": "value of right gene"
+                    }
+                }
+            case "afterlife":
+                help = {
+                    "afterlife\nsending off the dead people!": {
+                        "what kind of game is this?": "afterlife is somewhat a turn-based game. in each turn, the user and enemy can choose to either attack or heal.",
+                        "you vs. the enemy": "you will be playing as a 'queue' of corpses who still have a bit of life left in them to fight. the opponent is a randomly generated 'queue' of similar corpses based on your own dead population.",
+                        "attacking and healing": "each player can either attack (for attack stat ± 1) or heal (for enemy attack stat / 2 ± 1). the attack and initial health stat for each player is based on their left and right genes respectively.",
+                        "clearing the queue": "when one corpse 'dies' in any 'queue', we move on to the next corpse as the previous corpse is now permanently dead (if from your side) and will not be seen again. oh well, at least they lived their last days fruitfully.",
+                        "winning the game": "whoever has their queue clear first wins. if both queues become clear at the same time, it's a tie.",
+                        "skullpoints": "you also get skullpoints for every enemy corpse you kill! this is based on the value of their genes (see the numbers section for more info)."
+                    }
+                }
+            case _:
+                help = {}
+        await sendhelp(interaction, help)
+
+
+class helpview(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+
+        # Adds the dropdown to our view object.
+        self.add_item(helpdropdown())
 
 def imdata(id=None, game=False):
     data = {}
@@ -296,6 +397,16 @@ def parentsample(pop):
                 parents.append(pop[x])
                 break
     return parents
+
+async def sendhelp(interaction, help):
+    embeds = []
+
+    for x, y in help.items():
+        embeds.append(discord.Embed(title = x.split("\n")[0], description = x.split("\n")[1]))
+        for c, h in y.items():
+            embeds[-1].add_field(name = c, value = h, inline = True)
+
+    await interaction.followup.send(embeds=embeds, view=helpview()) 
 
 # constants
 alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

@@ -12,7 +12,6 @@ from datetime import timedelta
 from arrow import arrow, get
 from discord_timestamps import format_timestamp, TimestampType
 
-import classes
 import mini
 
 intents = discord.Intents.default()
@@ -131,21 +130,9 @@ async def help(interaction):
 
     print(f"/help was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
-    help = {
-        "the main game\nsee your population and watch it expand": {
-            "population": "view your population. shows the top 25 people in gene quality.\n`bottomfirst`: see the population from bottom to top\n`sort_by_serial`: show the people with the lowest serial numbers instead\n`full`: see the whole population (up to 250 people due to discord limits)",
-            "hatchery": "view your hatchery. shows all your eggs. you have `level + 1` slots in total and gain 1 egg every `5 * level` minutes (without upgrades)."
-        }
-    }
-    
-    embeds = []
+    help = {"help!\npick an option to proceed": {}}
 
-    for x, y in help.items():
-        embeds.append(discord.Embed(title = x.split("\n")[0], description = x.split("\n")[1]))
-        for c, h in y.items():
-            embeds[-1].add_field(name = c, value = h, inline = True)
-
-    await interaction.followup.send("how to use `/run`:", embeds=embeds)
+    await mini.sendhelp(interaction, help)
 
 # the main game
 @bot.tree.command(name="population", description="see your population")
@@ -156,7 +143,7 @@ async def population(interaction, bottomfirst: Optional[bool], sort_by_serial: O
 
     print(f"/population was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
-    population = classes.user(interaction.user.id).population
+    population = mini.user(interaction.user.id).population
     population = list(sorted(population, key=lambda x: x.serial if sort_by_serial else mini.value(x.genes)))
     if bottomfirst:
         population = list(reversed(population))
@@ -182,7 +169,7 @@ async def hatchery(interaction):
 
     print(f"/hatchery was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
-    data = classes.user(interaction.user.id)
+    data = mini.user(interaction.user.id)
 
     hatchery = data.hatchery
     population = data.population
@@ -197,7 +184,7 @@ async def hatchery(interaction):
     while len(hatchery) < limit + 1:
         parents = mini.parentsample(population)
         genes = mini.newgenes(*[p.genes for p in parents], upgrade=data.upgrades["mc5+"])
-        hatchery.append(classes.egg(registered+1, list(sorted([p.serial for p in parents])), nextegg, genes=genes[0], mutation=genes[1]))
+        hatchery.append(mini.egg(registered+1, list(sorted([p.serial for p in parents])), nextegg, genes=genes[0], mutation=genes[1]))
         nextegg += timedelta(seconds=5*limit*(100-data.upgrades["hwt5-"]*5)/100)
         registered += 1
 
@@ -216,7 +203,7 @@ async def hatchery(interaction):
         except:
             pass
 
-    await interaction.followup.send(embed=embed, view=classes.hatcheryview(interaction.user.id))
+    await interaction.followup.send(embed=embed, view=mini.hatcheryview(interaction.user.id))
  
     data = mini.imdata(interaction.user.id)
     data["hatchery"] = hatchery
@@ -224,13 +211,13 @@ async def hatchery(interaction):
     mini.exdata(data, id=interaction.user.id)
 
 # population control
-@bot.tree.command(name="fuckery", description="fuckery")
-async def fuckery(interaction, person1: str, person2: str, times: str):
+@bot.tree.command(name="frickery", description="frickery")
+async def frickery(interaction, person1: str, person2: str, times: str):
     mini.autodie(interaction.user.id)
 
     await interaction.response.defer()
 
-    print(f"/fuckery was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
+    print(f"/frickery was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
     data = mini.imdata(id=interaction.user.id)
     discovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y)
@@ -239,21 +226,24 @@ async def fuckery(interaction, person1: str, person2: str, times: str):
         parents = [int(parents[x]) if parents[x] != "max" else sorted(data["population"], key=lambda p: mini.value(p["genes"]))[x]["serial"] for x in range(2)]
         parents = [[x for x in data["population"] if x["serial"] == p][0] for p in parents]
     except:
-        await interaction.followup.send(embed=classes.error_embed("serial numbers"))
+        await interaction.followup.send(embed=mini.error_embed("serial numbers"))
         return
     ncoins = 0
     newg = []
     children = []
-    embeds = [discord.Embed(title="fuckery complete! :hot_face:")]
+    embeds = [discord.Embed(title="frickery complete! :hot_face:")]
     price = 5 * data["level"] * (100-data["upgrades"]["fp5-"]*5)/100
 
     if times == "max":
         atimes = math.floor(data["currency"]["coins"]/(5*data["level"] * (100-data["upgrades"]["fp5-"]*5)/100))
+        if atimes == 0:
+            await interaction.followup.send(embed=mini.error_embed("coins", need=(5*data["level"] * (100-data["upgrades"]["fp5-"]*5)/100)))
+            return
     else:
         try:
             atimes = min(math.floor(data["currency"]["coins"]/(5*data["level"])), int(times))
         except:
-            await interaction.followup.send(embed=classes.error_embed("times"))
+            await interaction.followup.send(embed=mini.error_embed("times"))
             return
 
     data["currency"]["coins"] -= atimes * price
@@ -262,8 +252,8 @@ async def fuckery(interaction, person1: str, person2: str, times: str):
 
     for x in range(atimes):
         genes = mini.newgenes(*[p["genes"] for p in parents], upgrade=data["upgrades"]["mc5+"])
-        new = classes.egg(data["registered"]+1, list(sorted([p["serial"] for p in parents])), arrow.Arrow.now(), genes=genes[0], mutation=genes[1])
-        data["population"].append(classes.person(new.serial, new.parents, genes=new.genes))
+        new = mini.egg(data["registered"]+1, list(sorted([p["serial"] for p in parents])), arrow.Arrow.now(), genes=genes[0], mutation=genes[1])
+        data["population"].append(mini.person(new.serial, new.parents, genes=new.genes))
         data["registered"] += 1
         children.append(new)
         ncoins += sum([26-mini.value(g) for g in new.genes])
@@ -316,7 +306,7 @@ async def selection(interaction, gene: str):
         mini.alpha.index(gene)
     except:
         if gene != "max":
-            await interaction.followup.send(embed=classes.error_embed("genes"))
+            await interaction.followup.send(embed=mini.error_embed("genes"))
             return
 
     data = mini.imdata(id=interaction.user.id)
@@ -361,7 +351,7 @@ async def cemetery(interaction, bottomfirst: Optional[bool], sort_by_serial: Opt
 
     print(f"/cemetery was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
-    cemetery = classes.user(interaction.user.id).cemetery
+    cemetery = mini.user(interaction.user.id).cemetery
     cemetery = list(sorted(cemetery, key=lambda x: x.serial if sort_by_serial else mini.value(x.genes)))
     if bottomfirst:
         cemetery = list(reversed(cemetery))
@@ -388,7 +378,7 @@ async def afterlife(interaction):
 
     embed = discord.Embed(title="what's after life?", description="what after life nae mame strife")
 
-    await interaction.followup.send(embed=embed, view=classes.afterlifestart(interaction.user.id))
+    await interaction.followup.send(embed=embed, view=mini.afterlifestart(interaction.user.id))
 
 # upgrade commands
 @bot.tree.command(name="upgrades", description="buy some upgrades")
@@ -401,13 +391,13 @@ async def upgrades(interaction):
 
     data = mini.imdata(id=interaction.user.id)
 
-    embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s upgrades", description=f"time to improve the game even further!\nyou have {data['currency']['skullpoints']} skullpoints.")
+    embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s upgrades", description=f"welcome to the upgrade shop!\nyou have {data['currency']['skullpoints']} skullpoints.")
 
     for u in data["upgrades"]:
         count = data['upgrades'][u]
         embed.add_field(name=f"{u}", value=f"**{mini.upgs[u][0]}**\ncurrently {u[-1]}{count*5}%\nnext {u[-1]}{(count+1)*5}%\ncosts {5**count} skullpoints")
 
-    await interaction.followup.send(embed=embed, view=classes.upgradeview(interaction.user.id))
+    await interaction.followup.send(embed=embed, view=mini.upgradeview(interaction.user.id))
 
 # profile commands
 @bot.tree.command(name="me", description="view your profile and stats")
@@ -446,7 +436,7 @@ async def profile(interaction):
     embed2.add_field(name="level-based", value="multipliers based solely on your level", inline=False)
     embed2.add_field(name="number of slots", value=data["level"]+1)
     embed2.add_field(name="base time taken for each egg (s)", value=data["level"]*5)
-    embed2.add_field(name="base fuckery price", value=data["level"]*5)
+    embed2.add_field(name="base frickery price", value=data["level"]*5)
 
     embed2.add_field(name="upgrade-based", value="multipliers based on your upgrades", inline=False)
     for u in data["upgrades"]:
@@ -469,7 +459,7 @@ async def editprof(interaction, updating: str, newvalue: str):
         mini.exdata(data, id=interaction.user.id)
         embed = discord.Embed(title=f"your new {updating}!", description=(f"your {updating} has been set to ```{newvalue}```" if updating == "bio" else f"your {updating} has been updated!") + "\ncheck `/viewprofile` to see how it looks!")
     else:
-        await interaction.followup.send(embed=classes.error_embed("variable"))
+        await interaction.followup.send(embed=mini.error_embed("variable"))
         return
 
     await interaction.followup.send(embed=embed)
