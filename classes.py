@@ -3,7 +3,6 @@ import discord
 from arrow import get, arrow
 from datetime import timedelta
 from random import random, choice, sample, randint
-from bot import afterlifeview
 
 class user:
     def __init__(self, id):
@@ -179,7 +178,6 @@ class afterlifestart(discord.ui.View):
 
             cemetery = [fighter(x["genes"]) for x in cemetery]
             enemies = sample(cemetery, len(cemetery))
-            ppl = len(enemies)
             data = {"cemetery": cemetery, "enemies": enemies}
             mini.exdata(data, id=self.id, game=True)
 
@@ -190,10 +188,8 @@ class afterlifestart(discord.ui.View):
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
                 embed.add_field(name=warrior, value=f"{fighterobj['genes']}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
-            msg = await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
             gdata = {"cemetery": cemetery, "enemies": enemies}
             mini.exdata(gdata, id=self.id, game=True) 
 
-            newcoins = mini.imdata(interaction.user.id)["currency"]["skullpoints"] - skullpoints
            
 

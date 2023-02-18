@@ -131,18 +131,19 @@ async def help(interaction):
 
     print(f"/help was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
-    help = """
-so there was supposed to be a help message here but i kind of dont know what i'll be doing yet 
-    """
+    help = {
+        "the main game\nsee your population and watch it expand": {
+            "population": "view your population. shows the top 25 people in gene quality.\n`bottomfirst`: see the population from bottom to top\n`sort_by_serial`: show the people with the lowest serial numbers instead\n`full`: see the whole population (up to 250 people due to discord limits)",
+            "hatchery": "view your hatchery. shows all your eggs. you have `level + 1` slots in total and gain 1 egg every `5 * level` minutes (without upgrades)."
+        }
+    }
+    
+    embeds = []
 
-    embed1 = discord.Embed(title = "commands", description = "these parameters must be passed.")
-    for x in help.split("\n\n"):
-        embed1.add_field(name = x.split("\n")[0], value = x.split("\n")[1], inline = True)
-
-    embeds = [embed1]
-
-    for e in embeds:
-        e.color = discord.Color.teal()
+    for x, y in help.items():
+        embeds.append(discord.Embed(title = x.split("\n")[0], description = x.split("\n")[1]))
+        for c, h in y.items():
+            embeds[-1].add_field(name = c, value = h, inline = True)
 
     await interaction.followup.send("how to use `/run`:", embeds=embeds)
 
@@ -222,6 +223,7 @@ async def hatchery(interaction):
     data["registered"] = registered
     mini.exdata(data, id=interaction.user.id)
 
+# population control
 @bot.tree.command(name="fuckery", description="fuckery")
 async def fuckery(interaction, person1: str, person2: str, times: str):
     mini.autodie(interaction.user.id)
