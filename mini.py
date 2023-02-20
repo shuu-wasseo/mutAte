@@ -359,7 +359,8 @@ class helpdropdown(discord.ui.Select):
                 }
             case "genes":
                 help = {
-                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {emojify(x): genes[x]["theme"] for x in genes}
+                    "the genes\nthere are a total of 26 (for now), each with its own unique theme. here are the genes Z to B.": {emojify(x): genes[x]["theme"] for x in genes},
+                    "the last gene\nwe only put this one here not just because it's the most special, but also because we can't put more than 25 fields in one embed.": {emojify("A"): genes["A"]["theme"]}
                 }
             case _:
                 help = {}
@@ -489,8 +490,8 @@ async def sendhelp(interaction, help):
 
     await interaction.followup.send(embeds=embeds, view=helpview())
 
-def emojify(genes):
-    return "".join([f"<:gene{x}:{genes[x]['emoji']}>" if 'emoji' in x else x for x in genes]) 
+def emojify(gs):
+    return "".join([f"<:gene{x}:{genes[x]['emoji']}>" if 'emoji' in genes[x] else x for x in gs]) 
 
 # constants
 alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -549,7 +550,6 @@ objects = {
     "cemetery": fighter,
     "enemies": fighter
 }
-
 genes = {
     'Z': {
         'theme': 'ashes', 
