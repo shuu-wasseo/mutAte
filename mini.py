@@ -339,11 +339,11 @@ class helpdropdown(discord.ui.Select):
             case "numbers":
                 help = {
                     "the numbers!\nif you were curious.": {
-                        "base chance of mutation (%)": "25 for Z, 0 for A (-1 per tier)",
-                        "base time for egg to hatch (min) / frickery price (coins)": "5 * level",
-                        "value of person's genes": "1 for Z, 26 for A for each gene (+1 per tier)\n\nthis value affects the number of skullpoints gained upon death and in the afterlife minigame, and serves as the ranking for gene quality.",
-                        "lifespan (12 hours) / power (afterlife)": "value of left gene",
-                        "charisma / health (afterlife)": "value of right gene"
+                        "base chance of mutation (%)": "25 for Z, 0 for A\n(-1 per tier)",
+                        "base hatching time (min)\nfrickery price (coins)": "5 * level",
+                        "value of person's genes": "1 for Z, 26 for A for each gene\n(+1 per tier)",
+                        "lifespan (12 hours)\npower (afterlife)": "value of left gene",
+                        "charisma\nhealth (afterlife)": "value of right gene"
                     }
                 }
             case "afterlife":
@@ -359,9 +359,12 @@ class helpdropdown(discord.ui.Select):
                 }
             case "genes":
                 help = {
-                    "the genes\nthere are a total of 26 (for now), each with its own unique theme. here are the genes Z to B.": {emojify(x): genes[x]["theme"] for x in genes},
-                    "the last gene\nwe only put this one here not just because it's the most special, but also because we can't put more than 25 fields in one embed.": {emojify("A"): genes["A"]["theme"]}
+                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {},
                 }
+                for x in range(5):
+                    lgs = list(genes.keys())
+                    help[f"tier {5-x}\n{emojify(lgs[x*5])} to {emojify(lgs[x*5+4])}"] = {emojify(x): genes[x]["theme"] for x in lgs[x*5:x*5+5]}
+                help[f"tier 0\n{emojify('A')}"] = {emojify("A"): genes["A"]["theme"]} 
             case _:
                 help = {}
         await sendhelp(interaction, help)
