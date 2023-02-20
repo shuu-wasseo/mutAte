@@ -587,7 +587,7 @@ genes = {
         'emoji': '1076354578490085388'
     }, 
     'R': {
-        'theme': 'clouds', 
+        'theme': 'frost', 
         'emoji': '1076354618667323443'
     }, 
     'Q': {'theme': 'wind'}, 
