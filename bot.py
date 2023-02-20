@@ -1,13 +1,11 @@
 # bot.py
 
 # load discord
-import os
-import discord
+import os, discord, math
 from discord import app_commands
 from typing import Optional
 from dotenv import load_dotenv
 from random import randint, choice
-import math
 from datetime import timedelta 
 from arrow import arrow, get
 from discord_timestamps import format_timestamp, TimestampType
@@ -153,7 +151,7 @@ async def population(interaction, bottomfirst: Optional[bool], sort_by_serial: O
     for x in range(len(people)):
         embeds.append(discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s population :people_holding_hands:", description=f"page {x+1} of {len(people)}"))
         for p in people[x]:
-            embeds[-1].add_field(name=f"person {p.serial} ({p.genes})", value=f"parents: {p.parents[0]}, {p.parents[1]}\ndeath {format_timestamp(p.deathtime, TimestampType.RELATIVE)}")
+            embeds[-1].add_field(name=f"person {p.serial} ({mini.emojify(p.genes)})", value=f"parents: {p.parents[0]}, {p.parents[1]}\ndeath {format_timestamp(p.deathtime, TimestampType.RELATIVE)}")
     
     if not full:
         embeds = [embeds[0]]
@@ -264,7 +262,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     embeds.append(discord.Embed(title=f"offspring of parents {', '.join(str(p['serial']) for p in parents)}", description=f"page {1} of {math.ceil(len(children)/25)}"))
     for x in range(len(children)): 
         new = children[x] 
-        nname = f':baby: person {new.serial} {new.genes}'
+        nname = f':baby: person {new.serial} {mini.emojify(new.genes)}'
         ndesc = f'\n**mutations: {new.mutation}**'
         if sum(mini.embedlen(embed) for embed in embeds) + len(nname) + len(ndesc) >= 6000:
             break
@@ -361,7 +359,7 @@ async def cemetery(interaction, bottomfirst: Optional[bool], sort_by_serial: Opt
     for x in range(len(people)):
         embeds.append(discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s cemetery :people_holding_hands:", description=f"page {x+1} of {len(people)}"))
         for p in people[x]:
-            embeds[-1].add_field(name=f"person {p.serial} ({p.genes}) :skull:", value=f"parents: {p.parents[0]}, {p.parents[1]}")
+            embeds[-1].add_field(name=f"person {p.serial} ({mini.emojify(p.genes)}) :skull:", value=f"parents: {p.parents[0]}, {p.parents[1]}")
     
     if not full:
         embeds = [embeds[0]]
@@ -429,7 +427,7 @@ async def profile(interaction):
         embed.add_field(name=c, value=data["currency"]["".join([y for y in c if y != " "])])
     embed.add_field(name="population", value=len(data["population"]))
     embed.add_field(name="discovered", value=len(data["discovered"]))
-    embed.add_field(name="highest discovered", value=sorted(data["discovered"], key=lambda x: (mini.value(x), min(mini.value(y) for y in x)))[0])
+    embed.add_field(name="highest discovered", value=mini.emojify(sorted(data["discovered"], key=lambda x: (mini.value(x), min(mini.value(y) for y in x)))[0]))
 
     embed2 = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s numbers", description="just some little stats hehe")
 

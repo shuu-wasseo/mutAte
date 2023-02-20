@@ -1,6 +1,4 @@
-import json
-import time
-import discord
+import json, time, discord
 from arrow import arrow, get
 from datetime import timedelta
 from random import random, choice, sample, randint
@@ -37,12 +35,7 @@ class person:
         self.lifespan = timedelta(hours=(26-value(self.genes[0]))*12)
         self.deathtime = birthtime + self.lifespan
         self.charisma = (25-value(self.genes[1]))
-    def p(self):
-        try:
-            return f"person {self.serial}: genes {self.genes} (parents {self.parents[0].serial}, {self.parents[1].serial})"
-        except:
-            return f"person {self.serial}: genes {self.genes} (first gen)"
-
+ 
 class egg(person):
     def __init__(self, serial, parents, hatchtime, genes = "", mutation = 0):
         super().__init__(serial, parents, genes)
@@ -87,7 +80,7 @@ class hatcheryview(discord.ui.View):
             for new in data["hatchery"]:
                 if arrow.Arrow.now() > get(new["hatchtime"]):
                     data["population"].append(person(new["serial"], new["parents"], genes=new["genes"], birthtime=arrow.Arrow.now()))
-                    collectembed.add_field(name=f':baby: person {new["serial"]} ({new["genes"]})', value=f'**mutations: {new["mutation"]}**\nparents: {", ".join([str(x) for x in new["parents"]])}')
+                    collectembed.add_field(name=f':baby: person {new["serial"]} ({emojify(new["genes"])})', value=f'**mutations: {new["mutation"]}**\nparents: {", ".join([str(x) for x in new["parents"]])}')
                     collected += 1
                     ncoins += sum([26-value(g) for g in new["genes"]])
                     if new["genes"] not in data["discovered"]:
@@ -190,9 +183,92 @@ class afterlifestart(discord.ui.View):
             battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
-                embed.add_field(name=warrior, value=f"{fighterobj['genes']}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
+                embed.add_field(name=warrior, value=f"{emojify(fighterobj['genes'])}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
             gdata = {"cemetery": cemetery, "enemies": enemies}
             exdata(gdata, id=self.id, game=True)
+            await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+
+class afterlifeview(discord.ui.View):
+    def __init__(self, id):
+        super().__init__()
+        self.id = id
+
+    def turn(self, cemetery, enemies, action = ""): 
+        myact = ""
+        data = imdata(id=self.id)
+        num = 0
+        if action == "attack":
+            attack = cemetery[0]["attack"]
+            num = randint(attack-1, attack+1)
+            enemies[0]["health"] -= num
+            if enemies[0]["health"] <= 0:
+                data["currency"]["skullpoints"] += 52-value(enemies[0]["genes"])
+        elif action == "heal":
+            healing = int(enemies[0]["attack"] / 2)
+            num = randint(healing-1, healing+1)
+            cemetery[0]["health"] += num
+        myact = f"{action}(s) for {num} :heart:"
+        exdata(data, id=self.id, game=True)
+        return myact, cemetery, enemies
+
+    async def action(self, action, interaction):
+        data = imdata(id=self.id, game=True)
+        maing = imdata(id=self.id)
+        cemetery, enemies = data["cemetery"], data["enemies"]
+
+        if [] in [cemetery, enemies]:
+            if [cemetery, enemies] == [[], []]:
+                await interaction.followup.send(embed=discord.Embed(title="it's a tie!", description=f"oh well. at least you still got skullpoints."))
+            elif cemetery == []:
+                await interaction.followup.send(embed=discord.Embed(title="you lost.", description=f"oh well. at least you still got skullpoints,"))
+            elif enemies == []:
+                await interaction.followup.send(embed=discord.Embed(title="you won!", description=f"slay!"))
+            exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+        else:
+            myact, cemetery, enemies = self.turn(cemetery, enemies, action=action)
+            youract, enemies, cemetery = self.turn(enemies, cemetery, action=choice(["attack", "heal"]))
+
+            embed = discord.Embed(title=f"you {action}!", description="")
+            desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
+            data = {"cemetery": cemetery, "enemies": enemies}
+            for x in data:
+                if data[x][0]["health"] <= 0:
+                    val = 52 - value(data[x][0]["genes"])
+                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. " + (f"(and you got {val} skullpoints!)" if x != "cemetery" else "") + "\n"
+                    maing["currency"]["skullpoints"] += val
+                    data[x] = data[x][1:]
+                    if x == "cemetery":
+                        maing[x] = maing[x][1:]
+            exdata(maing, id=self.id)
+            exdata(data, id=self.id, game=True)
+            embed.description = desc
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+            gdata = imdata(self.id, game=True)
+            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s afterlife :skull:")
+            battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
+            for warrior in battlefield:
+                fighterobj = battlefield[warrior]
+                embed.add_field(name=warrior, value=f"{len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])} left\n{emojify(fighterobj['genes'])}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
+            try:
+                msg = gamemsg[self.id]
+                await msg.edit(embed=embed, view=afterlifeview(self.id))
+            except:
+                msg = await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+                gamemsg[self.id] = msg
+            gdata = {"cemetery": cemetery, "enemies": enemies}
+            exdata(gdata, id=self.id, game=True)
+
+    @discord.ui.button(label="attack",style=discord.ButtonStyle.green)
+    async def attack(self, interaction, button):
+        if interaction.user.id == self.id:
+            await self.action("attack", interaction)
+
+    @discord.ui.button(label="heal",style=discord.ButtonStyle.green)
+    async def heal(self, interaction, button):
+        if interaction.user.id == self.id:
+            await self.action("heal", interaction)
 
 class helpdropdown(discord.ui.Select):
     def __init__(self, msg = None):
@@ -202,6 +278,7 @@ class helpdropdown(discord.ui.Select):
             discord.SelectOption(label="introduction", description="welcome to the game!"),
             discord.SelectOption(label="commands", description="so how the hell do i use this bot"),
             discord.SelectOption(label="numbers", description="crunching some numbers (for the curious people)"),
+            discord.SelectOption(label="genes", description="introducing every gene and its themes"),
             discord.SelectOption(label="afterlife", description="the dead people minigame")
         ]
 
@@ -279,6 +356,10 @@ class helpdropdown(discord.ui.Select):
                         "winning the game": "whoever has their queue clear first wins. if both queues become clear at the same time, it's a tie.",
                         "skullpoints": "you also get skullpoints for every enemy corpse you kill! this is based on the value of their genes (see the numbers section for more info)."
                     }
+                }
+            case "genes":
+                help = {
+                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {emojify(x): genes[x]["theme"] for x in genes}
                 }
             case _:
                 help = {}
@@ -367,7 +448,7 @@ def embedlen(embed): #copied from stackoverflow
     return len(total)
 
 def unlock(gene):
-    return discord.Embed(title=f"you've unlocked {gene}!", description=f"you now can run `/selection` again and kill of everyone with {alpha[min(alpha.index(gene)+5, 25)]} or below for both genes.")
+    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=f"you now can run `/selection` again and kill of everyone with {emojify(alpha[min(alpha.index(gene)+5, 25)])} or below for both genes.")
 
 def autodie(id):
     data = imdata(id)
@@ -406,7 +487,10 @@ async def sendhelp(interaction, help):
         for c, h in y.items():
             embeds[-1].add_field(name = c, value = h, inline = True)
 
-    await interaction.followup.send(embeds=embeds, view=helpview()) 
+    await interaction.followup.send(embeds=embeds, view=helpview())
+
+def emojify(genes):
+    return "".join([f"<:gene{x}:{genes[x]['emoji']}>" if 'emoji' in x else x for x in genes]) 
 
 # constants
 alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -465,4 +549,61 @@ objects = {
     "cemetery": fighter,
     "enemies": fighter
 }
+
+genes = {
+    'Z': {
+        'theme': 'ashes', 
+        'emoji': '1076353633353994280'
+    }, 
+    'Y': {
+        'theme': 'roots', 
+        'emoji': '1076353715910488125'
+    }, 
+    'X': {
+        'theme': 'growth', 
+        'emoji': '1076353790741065728'
+    }, 
+    'W': {
+        'theme': 'cinders', 
+        'emoji': '1076354182698766398'
+    }, 
+    'V': {
+        'theme': 'blossoms', 
+        'emoji': '1076354238176841808'
+    }, 
+    'U': {
+        'theme': 'crags', 
+        'emoji': '1076354317562433538'
+    }, 
+    'T': {
+        'theme': 'sand', 
+        'emoji': '1076354500727677028'
+    }, 
+    'S': {
+        'theme': 'tide', 
+        'emoji': '1076354578490085388'
+    }, 
+    'R': {
+        'theme': 'clouds', 
+        'emoji': '1076354618667323443'
+    }, 
+    'Q': {'theme': 'wind'}, 
+    'P': {'theme': 'thunder'}, 
+    'O': {'theme': 'blood'}, 
+    'N': {'theme': 'poison'}, 
+    'M': {'theme': 'acid'},
+    'L': {'theme': 'amber'}, 
+    'K': {'theme': 'steel'}, 
+    'J': {'theme': 'gold'}, 
+    'I': {'theme': 'flame'}, 
+    'H': {'theme': 'magma'},
+    'G': {'theme': 'crystals'}, 
+    'F': {'theme': 'colours'}, 
+    'E': {'theme': 'light'}, 
+    'D': {'theme': 'plasma'}, 
+    'C': {'theme': 'gravity'}, 
+    'B': {'theme': 'singularity'}, 
+    'A': {'theme': 'stars'}
+}
 gamemsg = {}
+
