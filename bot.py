@@ -51,7 +51,7 @@ class afterlifeview(discord.ui.View):
             num = randint(attack-1, attack+1)
             enemies[0]["health"] -= num
             if enemies[0]["health"] <= 0:
-                data["currency"]["skullpoints"] += 52-mini.value(enemies[0]["genes"])
+                data["currency"]["skullpoints"] += mini.value(enemies[0]["genes"])
         elif action == "heal":
             healing = int(enemies[0]["attack"] / 2)
             num = randint(healing-1, healing+1)
@@ -82,7 +82,7 @@ class afterlifeview(discord.ui.View):
             data = {"cemetery": cemetery, "enemies": enemies}
             for x in data:
                 if data[x][0]["health"] <= 0:
-                    val = 52 - mini.value(data[x][0]["genes"])
+                    val = mini.value(data[x][0]["genes"])
                     desc += ("you" if x == "cemetery" else "an enemy") + f" died (and you got {val} skullpoints!)\n"
                     maing["currency"]["skullpoints"] += val
                     data[x] = data[x][1:]
@@ -142,7 +142,7 @@ async def population(interaction, bottomfirst: Optional[bool], sort_by_serial: O
     print(f"/population was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
     population = mini.user(interaction.user.id).population
-    population = list(sorted(population, key=lambda x: x.serial if sort_by_serial else mini.value(x.genes)))
+    population = list(sorted(population, key=lambda x: x.serial if sort_by_serial else - mini.value(x.genes)))
     if bottomfirst:
         population = list(reversed(population))
 
@@ -221,7 +221,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     discovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y)
     parents = [person1, person2] 
     try:
-        parents = [int(parents[x]) if parents[x] != "max" else sorted(data["population"], key=lambda p: mini.value(p["genes"]))[x]["serial"] for x in range(2)]
+        parents = [int(parents[x]) if parents[x] != "max" else sorted(data["population"], key=lambda p: -mini.value(p["genes"]))[x]["serial"] for x in range(2)]
         parents = [[x for x in data["population"] if x["serial"] == p][0] for p in parents]
     except:
         await interaction.followup.send(embed=mini.error_embed("serial numbers"))
@@ -254,7 +254,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
         data["population"].append(mini.person(new.serial, new.parents, genes=new.genes))
         data["registered"] += 1
         children.append(new)
-        ncoins += sum([26-mini.value(g) for g in new.genes])
+        ncoins += sum([mini.value(g) for g in new.genes])
         if new.genes not in data["discovered"]:
             data["discovered"].append(new.genes)
             newg.append(new.genes)
@@ -350,7 +350,7 @@ async def cemetery(interaction, bottomfirst: Optional[bool], sort_by_serial: Opt
     print(f"/cemetery was used in {interaction.channel} ({interaction.guild}) by {interaction.user}.")
 
     cemetery = mini.user(interaction.user.id).cemetery
-    cemetery = list(sorted(cemetery, key=lambda x: x.serial if sort_by_serial else mini.value(x.genes)))
+    cemetery = list(sorted(cemetery, key=lambda x: x.serial if sort_by_serial else -mini.value(x.genes)))
     if bottomfirst:
         cemetery = list(reversed(cemetery))
 
@@ -427,7 +427,7 @@ async def profile(interaction):
         embed.add_field(name=c, value=data["currency"]["".join([y for y in c if y != " "])])
     embed.add_field(name="population", value=len(data["population"]))
     embed.add_field(name="discovered", value=len(data["discovered"]))
-    embed.add_field(name="highest discovered", value=mini.emojify(sorted(data["discovered"], key=lambda x: (mini.value(x), min(mini.value(y) for y in x)))[0]))
+    embed.add_field(name="highest discovered", value=mini.emojify(sorted(data["discovered"], key=lambda x: (-mini.value(x), -min(mini.value(y) for y in x)))[0]))
 
     embed2 = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s numbers", description="just some little stats hehe")
 

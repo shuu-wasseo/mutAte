@@ -32,9 +32,9 @@ class person:
                     best = min([alpha.index(p.genes[x]) for p in parents])
                     self.genes += alpha[max(0, best-1)]
         self.birthtime = birthtime
-        self.lifespan = timedelta(hours=(26-value(self.genes[0]))*12)
+        self.lifespan = timedelta(hours=value(self.genes[0])*12)
         self.deathtime = birthtime + self.lifespan
-        self.charisma = (25-value(self.genes[1]))
+        self.charisma = value(self.genes[1])
  
 class egg(person):
     def __init__(self, serial, parents, hatchtime, genes = "", mutation = 0):
@@ -45,7 +45,7 @@ class egg(person):
 class fighter:
     def __init__(self, genes):
         self.genes = genes
-        stats = [27 - value(x) for x in genes]
+        stats = [value(x) for x in genes]
         self.attack = randint(stats[0]-1, stats[0]+1)
         self.health = randint(stats[1]-1, stats[1]+1)
 
@@ -55,7 +55,7 @@ class error_embed(discord.Embed):
         super().__init__()
         self.title = f"error! invalid {error}."
         if error == "coins":
-            self.description = f"you need {need} coins per egg."
+            self.description = f"you need {int(need)} coins per egg."
         else:
             self.description = f"check `/help` to see if your {error.split()[-1]} is in the right format. otherwise, please join the support server here.\nhttps://discord.gg/GPfpUNmxPP"
         self.color = discord.Color.dark_red()
@@ -82,7 +82,7 @@ class hatcheryview(discord.ui.View):
                     data["population"].append(person(new["serial"], new["parents"], genes=new["genes"], birthtime=arrow.Arrow.now()))
                     collectembed.add_field(name=f':baby: person {new["serial"]} ({emojify(new["genes"])})', value=f'**mutations: {new["mutation"]}**\nparents: {", ".join([str(x) for x in new["parents"]])}')
                     collected += 1
-                    ncoins += sum([26-value(g) for g in new["genes"]])
+                    ncoins += sum(value(g) for g in new["genes"])
                     if new["genes"] not in data["discovered"]:
                         data["discovered"].append(new["genes"])
                         newg.append(new["genes"])
@@ -202,7 +202,7 @@ class afterlifeview(discord.ui.View):
             num = randint(attack-1, attack+1)
             enemies[0]["health"] -= num
             if enemies[0]["health"] <= 0:
-                data["currency"]["skullpoints"] += 52-value(enemies[0]["genes"])
+                data["currency"]["skullpoints"] += value(enemies[0]["genes"])
         elif action == "heal":
             healing = int(enemies[0]["attack"] / 2)
             num = randint(healing-1, healing+1)
@@ -212,10 +212,11 @@ class afterlifeview(discord.ui.View):
         return myact, cemetery, enemies
 
     async def action(self, action, interaction):
+        await interaction.response.defer()
         data = imdata(id=self.id, game=True)
         maing = imdata(id=self.id)
         cemetery, enemies = data["cemetery"], data["enemies"]
-
+    
         if [] in [cemetery, enemies]:
             if [cemetery, enemies] == [[], []]:
                 await interaction.followup.send(embed=discord.Embed(title="it's a tie!", description=f"oh well. at least you still got skullpoints."))
@@ -233,7 +234,7 @@ class afterlifeview(discord.ui.View):
             data = {"cemetery": cemetery, "enemies": enemies}
             for x in data:
                 if data[x][0]["health"] <= 0:
-                    val = 52 - value(data[x][0]["genes"])
+                    val = value(data[x][0]["genes"])
                     desc += ("you" if x == "cemetery" else "an enemy") + f" died. " + (f"(and you got {val} skullpoints!)" if x != "cemetery" else "") + "\n"
                     maing["currency"]["skullpoints"] += val
                     data[x] = data[x][1:]
@@ -242,12 +243,22 @@ class afterlifeview(discord.ui.View):
             exdata(maing, id=self.id)
             exdata(data, id=self.id, game=True)
             embed.description = desc
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
             gdata = imdata(self.id, game=True)
             cemetery, enemies = gdata["cemetery"], gdata["enemies"]
             embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s afterlife :skull:")
-            battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
+            try:
+                battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
+            except:
+                if [cemetery, enemies] == [[], []]:
+                    await interaction.followup.send(embed=discord.Embed(title="it's a tie!", description=f"oh well. at least you still got skullpoints."))
+                elif cemetery == []:
+                    await interaction.followup.send(embed=discord.Embed(title="you lost.", description=f"oh well. at least you still got skullpoints,"))
+                elif enemies == []:
+                    await interaction.followup.send(embed=discord.Embed(title="you won!", description=f"slay!"))
+                exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+                return
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
                 embed.add_field(name=warrior, value=f"{len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])} left\n{emojify(fighterobj['genes'])}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
@@ -413,7 +424,7 @@ def exdata(ndata, id=None, game=False):
     json.dump(data, open(file, "w"), default=str, indent=4)
 
 def value(genes):
-    return sum([alpha.index(x) for x in genes])
+    return sum(alpha.index(x)+1 for x in genes)
 
 def evolchance(gene):
     return alpha.index(gene) / 100 
@@ -452,7 +463,7 @@ def embedlen(embed): #copied from stackoverflow
     return len(total)
 
 def unlock(gene):
-    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=f"you now can run `/selection` again and kill of everyone with {emojify(alpha[min(alpha.index(gene)+5, 25)])} or below for both genes.")
+    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=f"you now can run `/selection`" + (" again " if gene != "U" else " ") + "and kill of everyone with {emojify(alpha[min(alpha.index(gene)+5, 25)])} or below for both genes." if alpha.index(gene) <= 20 else "keep grinding!")
 
 def autodie(id):
     data = imdata(id)
@@ -463,6 +474,8 @@ def autodie(id):
     exdata(data, id=id) 
 
 def parentsample(pop):
+    if pop == []:
+        pop = initdata["population"]
     parents = []
     for x in range(2):
         charis = []
