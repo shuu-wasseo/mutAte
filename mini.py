@@ -511,7 +511,7 @@ def emojify(gs):
     return "".join([f"<:gene{x}:{genes[x]['emoji']}>" if 'emoji' in genes[x] else x for x in gs]) 
 
 # constants
-alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+alpha = "ZYXWVUTSRQPONMLKJIHGFEDCBA"
 firstgenes = newgenes("ZZ", "ZZ")
 initdata = {
     "level": 1,
