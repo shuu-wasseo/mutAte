@@ -1,4 +1,5 @@
-from mini import value, evolchance, newgenes
+from mini import value, evolchance, newgenes, unlock, emojify
+import discord
 
 def test(num, tot, x, y, testin=False):
     try:
@@ -36,6 +37,27 @@ tests = {
         "func": newgenes,
         "tests": [
             (["ZZ", "YY"], {}, [x+y for x in "XYZ" for y in "XYZ"]) for x in range(9)
+        ]
+    },
+    "mini.unlock": {
+        "func": unlock,
+        "tests": [
+            (["Z"], {}, discord.Embed(
+                title=f"you've unlocked {emojify('Z')}!", 
+                description="keep grinding!"
+            )),
+            (["U"], {}, discord.Embed(
+                title=f"you've unlocked {emojify('U')}!", 
+                description=f"you now can run `/selection` and kill off everyone with {emojify('Z')} or below for both genes."
+            )),
+            (["T"], {}, discord.Embed(
+                title=f"you've unlocked {emojify('T')}!", 
+                description=f"you now can run `/selection` again and kill off everyone with {emojify('Y')} or below for both genes."
+            )),
+            (["A"], {}, discord.Embed(
+                title=f"you've unlocked {emojify('A')}!", 
+                description="keep grinding!"
+            ))
         ]
     }
 }

@@ -464,7 +464,7 @@ def embedlen(embed): #copied from stackoverflow
     return len(total)
 
 def unlock(gene):
-    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=f"you now can run `/selection`" + (" again " if gene != "U" else " ") + "and kill of everyone with {emojify(alpha[min(alpha.index(gene)+5, 25)])} or below for both genes." if alpha.index(gene) <= 20 else "keep grinding!")
+    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=f"you now can run `/selection`" + (" again " if gene != "U" else " ") + f"and kill off everyone with {emojify(alpha[min(alpha.index(gene)+5, 25)])} or below for both genes." if alpha.index(gene) < 5 or alpha.index(gene) > 20 else "keep grinding!")
 
 def autodie(id):
     data = imdata(id)
