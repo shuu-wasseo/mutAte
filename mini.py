@@ -342,6 +342,7 @@ class helpdropdown(discord.ui.Select):
                         "afterlife": "starts the afterlife minigame."
                     },
                     "misc\nupgrades and profiles!": {
+                        "help": "this command!",
                         "upgrade": "view and buy upgrades! the currency used here is skullpoints.",
                         "me": "view your profile and some stats.",
                         "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n'newvalue': the new url / bio"
