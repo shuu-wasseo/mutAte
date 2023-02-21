@@ -7,7 +7,7 @@ def test(num, tot, x, y, testin=False):
             cond = x in y
         else:
             cond = x == y
-        assert cond, f"should be {y}, instead got {x}"
+        assert cond, f"should be {y}, instead got {x}" + (f"\n{y.title}, {y.description} != {x.title}, {x.description}" if isinstance(y, discord.Embed) else "")
     except Exception as e:
         raise e
     else:
