@@ -428,7 +428,7 @@ def value(genes):
     return sum(alpha.index(x)+1 for x in genes)
 
 def evolchance(gene):
-    return alpha.index(gene) / 100 
+    return (26-value(gene)) / 100 
 
 def newgenes(gene1, gene2, upgrade=0):
     genes = ""
@@ -442,7 +442,7 @@ def newgenes(gene1, gene2, upgrade=0):
             inherit = gene2[x]
         finalchance = evolchance(inherit)/2 * (100 + upgrade*5)/100
         if chance < finalchance:
-            genes += alpha[max(alpha.index(inherit.upper())-1, 0)]
+            genes += alpha[min(alpha.index(inherit)+1, 25)]
         else:
             genes += inherit
         mutation.append(chance < finalchance)
