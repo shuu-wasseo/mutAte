@@ -28,7 +28,6 @@ class MyClient(discord.Client):
     async def setup_hook(self):
         for guild in self.guilds:
             self.tree.clear_commands(guild=guild)
-        #self.tree.add_command(self.tree.get_command("me"), override=True)
         await self.tree.sync()
 
 bot = MyClient(intents=intents)
