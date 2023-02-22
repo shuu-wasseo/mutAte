@@ -427,7 +427,9 @@ async def profile(interaction):
         embed.add_field(name=c, value=data["currency"]["".join([y for y in c if y != " "])])
     embed.add_field(name="population", value=len(data["population"]))
     embed.add_field(name="discovered", value=len(data["discovered"]))
-    embed.add_field(name="highest discovered", value=mini.emojify(sorted(data["discovered"], key=lambda x: (-mini.value(x), -min(mini.value(y) for y in x)))[0]))
+    sortedgenes = sorted(data["discovered"], key=lambda x: (-mini.value(x), -min(mini.value(y) for y in x)))
+    sortedgenes = [mini.emojify(x) for x in sortedgenes if mini.value(x) == mini.value(sortedgenes[0])]
+    embed.add_field(name="highest discovered", value=", ".join(sortedgenes))
 
     embed2 = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s numbers", description="just some little stats hehe")
 
