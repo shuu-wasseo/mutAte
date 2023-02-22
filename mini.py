@@ -225,6 +225,8 @@ class afterlifeview(discord.ui.View):
             elif enemies == []:
                 await interaction.followup.send(embed=discord.Embed(title="you won!", description=f"slay!"))
             exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+            maing["cemetery"] = []
+            exdata(maing, id=self.id)
         else:
             myact, cemetery, enemies = self.turn(cemetery, enemies, action=action)
             youract, enemies, cemetery = self.turn(enemies, cemetery, action=choice(["attack", "heal"]))
