@@ -12,10 +12,22 @@ class user:
         self.totalpeople = data["totalpeople"]
         self.discovered = data["discovered"]
         self.registered = data["registered"]
-        self.population = [person(p["serial"], p["parents"], genes=p["genes"]) for p in data["population"]]
+        self.population = [
+            person(
+                p["serial"], p["parents"], genes=p["genes"]
+            ) for p in data["population"]
+        ] 
         self.lastegg = get(data["lastegg"], tzinfo="Asia/Singapore")
-        self.hatchery = [egg(p["serial"], p["parents"], get(p["hatchtime"], tzinfo="Asia/Singapore"), genes=p["genes"], mutation=p["mutation"]) for p in data["hatchery"]]
-        self.cemetery = [person(p["serial"], p["parents"], genes=p["genes"]) for p in data["cemetery"]]
+        self.hatchery = [
+            egg(
+                p["serial"], p["parents"], get(p["hatchtime"], tzinfo="Asia/Singapore"), 
+                genes=p["genes"], mutation=p["mutation"]
+            ) for p in data["hatchery"]
+        ] 
+        self.cemetery = [
+            person(p["serial"], p["parents"], genes=p["genes"]) 
+            for p in data["cemetery"]
+        ] 
         self.upgrades = data["upgrades"]
 
 class person:
@@ -51,13 +63,15 @@ class fighter:
 
 # embeds
 class error_embed(discord.Embed):
-    def __init__(self, error, need=0):
+    def __init__(self, err, need=0):
         super().__init__()
-        self.title = f"error! invalid {error}."
-        if error == "coins":
+        self.title = f"error! invalid {err}."
+        if err == "coins":
             self.description = f"you need {int(need)} coins per egg."
         else:
-            self.description = f"check `/help` to see if your {error.split()[-1]} is in the right format. otherwise, please join the support server here.\nhttps://discord.gg/GPfpUNmxPP"
+            server = "https://discord.gg/CZs6CkZZfd"
+            self.description = f"check `/help` to see if your {err} is in the right format." 
+            self.description += f"otherwise, please join the support server here.\n{server}" 
         self.color = discord.Color.dark_red()
 
 # views
@@ -73,29 +87,46 @@ class hatcheryview(discord.ui.View):
             data = imdata(id=self.id)
             collected = 0 
             ncoins = 0
-            collectembed = discord.Embed(title="collection complete!")
+            cembed = discord.Embed(title="collection complete!")
             newg = [] 
             discovered = min(alpha.index(x) for y in data["discovered"] for x in y)
 
             for new in data["hatchery"]:
                 if arrow.Arrow.now() > get(new["hatchtime"]):
-                    data["population"].append(person(new["serial"], new["parents"], genes=new["genes"], birthtime=arrow.Arrow.now()))
-                    collectembed.add_field(name=f':baby: person {new["serial"]} ({emojify(new["genes"])})', value=f'**mutations: {new["mutation"]}**\nparents: {", ".join([str(x) for x in new["parents"]])}')
+                    data["population"].append(person(
+                        new["serial"], new["parents"], 
+                        genes=new["genes"], birthtime=arrow.Arrow.now()
+                    )) 
+                    cembed.add_field(
+                        name=f':baby: person {new["serial"]} ({emojify(new["genes"])})', 
+                        value=f'**mutations: {new["mutation"]}**\n' 
+                        + f'parents: {", ".join([str(x) for x in new["parents"]])}' 
+                    ) 
                     collected += 1
                     ncoins += sum(value(g) for g in new["genes"])
                     if new["genes"] not in data["discovered"]:
                         data["discovered"].append(new["genes"])
                         newg.append(new["genes"])
 
-            collectembed.description = f"you collected {collected} eggs and got {ncoins} coins.\n" + ("new combos: " + ", ".join(newg) if len(newg) != 0 else "no new combos found.")
+            cembed.description = f"you collected {collected} eggs and got {ncoins} coins.\n" 
+            if len(newg) != 0: 
+                cembed.description += "new combos: " + ", ".join(newg) 
+            else:
+                cembed.description += "no new combos found." 
             data["totalpeople"] += collected
             initlevel = data["level"]
             while (data["level"] + 1) * (data["level"] + 2) / 2 <= len(data["discovered"]):
                 data["level"] += 1
-            data["hatchery"] = [egg for egg in data["hatchery"] if get(egg["hatchtime"]) >= arrow.Arrow.now()]
-            data["lastegg"] = max([get(egg["hatchtime"]) for egg in data["hatchery"]] + [arrow.Arrow.now()])
+            data["hatchery"] = [
+                egg for egg in data["hatchery"] 
+                if get(egg["hatchtime"]) >= arrow.Arrow.now()
+            ] 
+            data["lastegg"] = max(
+                [get(egg["hatchtime"]) for egg in data["hatchery"]] 
+                + [arrow.Arrow.now()]
+            ) 
             data["currency"]["coins"] += ncoins
-            await interaction.followup.send(embed=collectembed, ephemeral=True)
+            await interaction.followup.send(embed=cembed, ephemeral=True)
             exdata(data, id=self.id)
             if data["level"] != initlevel:
                 await interaction.followup.send(
@@ -106,20 +137,31 @@ class hatcheryview(discord.ui.View):
                     ephemeral=True
                 )
 
-            nextegg = data["lastegg"] + timedelta(seconds=5*data["level"]*(100-data["upgrades"]["hwt5-"]*5)/100)
+            interval = 5*data["level"]*(100-data["upgrades"]["hwt5-"]*5)/100
+            nextegg = data["lastegg"]
+            nextegg += timedelta(seconds=interval) 
 
             while len(data["hatchery"]) < data["level"] + 1:
                 parents = parentsample(data["population"])
-                genes = newgenes(*[p["genes"] for p in parents], upgrade=data["upgrades"]["mc5+"])
-                data["hatchery"].append(egg(data["registered"]+1, list(sorted([p["serial"] for p in parents])), nextegg, genes=genes[0], mutation=genes[1]))
-                nextegg += timedelta(seconds=5*data["level"]*(100-data["upgrades"]["hwt5-"]*5)/100)
+                genes = newgenes(
+                    *[p["genes"] for p in parents], 
+                    upgrade=data["upgrades"]["mc5+"]
+                ) 
+                data["hatchery"].append(egg(
+                    data["registered"]+1, list(sorted([p["serial"] for p in parents])), nextegg, 
+                    genes=genes[0], mutation=genes[1]
+                )) 
+                nextegg += timedelta(seconds=interval) 
                 data["registered"] += 1
 
             exdata(data, id=self.id)
 
             ndiscovered = min(alpha.index(x) for y in data["discovered"] for x in y)
             if ndiscovered < discovered:
-                await interaction.followup.send(embed=unlock(alpha[ndiscovered]), ephemeral=True)
+                await interaction.followup.send(
+                    embed=unlock(alpha[ndiscovered]), 
+                    ephemeral=True
+                ) 
 
 # views
 class upgradeview(discord.ui.View):
@@ -134,9 +176,16 @@ class upgradeview(discord.ui.View):
                 data["currency"]["skullpoints"] -= 5 ** data["upgrades"][upg]
                 data["upgrades"][upg] += 1
                 exdata(data, id=interaction.user.id)
-                embed = discord.Embed(title="upgrade!", description=f"you have upgraded {upg} to {upg[-1]}{data['upgrades'][upg]*5}%!")
+                embed = discord.Embed(
+                    title="upgrade!", 
+                    description=f"you have upgraded {upg} to {upg[-1]}{data['upgrades'][upg]*5}%!"
+                ) 
             else:
-                embed = discord.Embed(title="not enough skullpoints :skull:", description=f"you need {5 ** data['upgrades'][upg]} skullpoints for this upgrade. get more skullpoints and try again.")
+                price = 5 ** data['upgrades'][upg]
+                embed = discord.Embed(
+                    title="not enough skullpoints :skull:", 
+                    description=f"you need {price} skullpoints to buy this. get more and try again!" 
+                ) 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="mc5+",style=discord.ButtonStyle.green)
@@ -179,11 +228,19 @@ class afterlifestart(discord.ui.View):
 
             gdata = imdata(self.id, game=True)
             cemetery, enemies = gdata["cemetery"], gdata["enemies"]
-            embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s afterlife :skull:")
+            user = interaction.user
+            embed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s afterlife :skull:" 
+            ) 
             battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
-                embed.add_field(name=warrior, value=f"{emojify(fighterobj['genes'])}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
+                embed.add_field(
+                    name=warrior, 
+                    value=f"{emojify(fighterobj['genes'])}\n"
+                    + f":punch: {fighterobj['attack']}\n"
+                    + f":heart: {fighterobj['health']}" 
+                ) 
             gdata = {"cemetery": cemetery, "enemies": enemies}
             exdata(gdata, id=self.id, game=True)
             await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
@@ -218,18 +275,31 @@ class afterlifeview(discord.ui.View):
         cemetery, enemies = data["cemetery"], data["enemies"]
     
         if [] in [cemetery, enemies]:
+            title, description = "", ""
             if [cemetery, enemies] == [[], []]:
-                await interaction.followup.send(embed=discord.Embed(title="it's a tie!", description=f"oh well. at least you still got skullpoints."))
+                title = "it's a tie!"
+                description = f"oh well. at least you still got skullpoints." 
             elif cemetery == []:
-                await interaction.followup.send(embed=discord.Embed(title="you lost.", description=f"oh well. at least you still got skullpoints,"))
+                title = "you lost."
+                description = f"oh well. at least you still got skullpoints," 
             elif enemies == []:
-                await interaction.followup.send(embed=discord.Embed(title="you won!", description=f"slay!"))
+                title = "you won!"
+                description = "slay!"
+            await interaction.followup.send(embed=discord.Embed(
+                title=title, description=description
+            )) 
             exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
             maing["cemetery"] = []
             exdata(maing, id=self.id)
         else:
-            myact, cemetery, enemies = self.turn(cemetery, enemies, action=action)
-            youract, enemies, cemetery = self.turn(enemies, cemetery, action=choice(["attack", "heal"]))
+            myact, cemetery, enemies = self.turn(
+                cemetery, enemies, 
+                action=action
+            )
+            youract, enemies, cemetery = self.turn(
+                enemies, cemetery, 
+                action=choice(["attack", "heal"]
+            )) 
 
             embed = discord.Embed(title=f"you {action}!", description="")
             desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
@@ -237,7 +307,8 @@ class afterlifeview(discord.ui.View):
             for x in data:
                 if data[x][0]["health"] <= 0:
                     val = value(data[x][0]["genes"])
-                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. " + (f"(and you got {val} skullpoints!)" if x != "cemetery" else "") + "\n"
+                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
+                    desc += (f"(and you got {val} skullpoints!)" if x != "cemetery" else "") + "\n" 
                     maing["currency"]["skullpoints"] += val
                     data[x] = data[x][1:]
                     if x == "cemetery":
@@ -249,21 +320,35 @@ class afterlifeview(discord.ui.View):
 
             gdata = imdata(self.id, game=True)
             cemetery, enemies = gdata["cemetery"], gdata["enemies"]
-            embed = discord.Embed(title=f"{interaction.user.display_name} ({interaction.user.name})'s afterlife :skull:")
+            user = interaction.user
+            embed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s afterlife :skull:"
+            ) 
             try:
                 battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
             except:
+                title, description = "", ""
                 if [cemetery, enemies] == [[], []]:
-                    await interaction.followup.send(embed=discord.Embed(title="it's a tie!", description=f"oh well. at least you still got skullpoints."))
+                    title = "it's a tie!"
+                    description = f"oh well. at least you still got skullpoints." 
                 elif cemetery == []:
-                    await interaction.followup.send(embed=discord.Embed(title="you lost.", description=f"oh well. at least you still got skullpoints,"))
+                    title = "you lost."
+                    description = f"oh well. at least you still got skullpoints," 
                 elif enemies == []:
-                    await interaction.followup.send(embed=discord.Embed(title="you won!", description=f"slay!"))
+                    title = "you won!"
+                    description = "slay!"
+                await interaction.followup.send(embed=discord.Embed(
+                    title=title, description=description
+                ))
                 exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
                 return
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
-                embed.add_field(name=warrior, value=f"{len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])} left\n{emojify(fighterobj['genes'])}\n:punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}")
+                left = len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])
+                embed.add_field(
+                    name=warrior, 
+                    value=f"{left} left\n{emojify(fighterobj['genes'])}\n"
+                    + ":punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}") 
             try:
                 msg = gamemsg[self.id]
                 await msg.edit(embed=embed, view=afterlifeview(self.id))
@@ -287,15 +372,22 @@ class helpdropdown(discord.ui.Select):
     def __init__(self, msg = None):
 
         # Set the options that will be presented inside the dropdown
+        options = {
+            "introduction": "welcome to the game!",
+            "commands": "so how the hell do i use this bot",
+            "numbers": "crunching some numbers (for the curious people)",
+            "genes": "introducing every gene and its themes",
+            "afterlife": "the dead people minigame"
+        }
+
         options = [
-            discord.SelectOption(label="introduction", description="welcome to the game!"),
-            discord.SelectOption(label="commands", description="so how the hell do i use this bot"),
-            discord.SelectOption(label="numbers", description="crunching some numbers (for the curious people)"),
-            discord.SelectOption(label="genes", description="introducing every gene and its themes"),
-            discord.SelectOption(label="afterlife", description="the dead people minigame")
+            discord.SelectOption(label=o, description=options[o]) for o in options
         ]
 
-        super().__init__(placeholder='saurr what do you need help with', min_values=1, max_values=1, options=options)
+        super().__init__(
+            placeholder='saurr what do you need help with', 
+            min_values=1, max_values=1, options=options
+        ) 
         self.msg = msg
 
     async def callback(self, interaction: discord.Interaction):
@@ -305,39 +397,39 @@ class helpdropdown(discord.ui.Select):
             case "introduction":
                 help = {
                     "welcome to the game!\nthis game is about population control.": {
-                        "some background": "recently, scientists have found two people with special genes, and these genes have superhuman potential. as of today, these genes have been found to mutate up to 25 times beyond their original state. these 25 mutations will be referred to using the letters Y to A.",
-                        "aim of the game": "you start off with 2 people with ZZ genes. your goal is to, through population control, finally have one person with AA genes."
+                        "some background": "recently, scientists have found two people with special genes, and these genes have superhuman potential. as of today, these genes have been found to mutate up to 25 times beyond their original state. these 25 mutations will be referred to using the letters Y to A.", 
+                        "aim of the game": "you start off with 2 people with ZZ genes. your goal is to, through population control, finally have one person with AA genes." 
                     },
                     "how do i get someone with AA genes?\nthere are a few ways!": {
-                        "reproduction": "your people are able to produce offspring! with every offspring, there is a tiny chance of each gene mutating! slowly, you'll get better and better genes.",
-                        "frickery": "if needed, you might be able to make two people procreate multiple babies! this is especially useful if you pick out people with the best genes as there is a higher chance that the genes of the babies will mutate!",
-                        "selection": "to allow a better gene pool, you may be allowed to kill off people with weaker genes to increase the general quality of your population's genes."
+                        "reproduction": "your people are able to produce offspring! with every offspring, there is a tiny chance of each gene mutating! slowly, you'll get better and better genes.", 
+                        "frickery": "if needed, you might be able to make two people procreate multiple babies! this is especially useful if you pick out people with the best genes as there is a higher chance that the genes of the babies will mutate!", 
+                        "selection": "to allow a better gene pool, you may be allowed to kill off people with weaker genes to increase the general quality of your population's genes." 
                     },
                     "but what about the dead people?\ndon't worry, you'll still get to see them": {
                         "cemetery": "you can visit the cemetery to see how everyone is doing!",
-                        "afterlife minigame": "there's a little minigame involving the dead people as a quick send-off! :>"
+                        "afterlife minigame": "there's a little minigame involving the dead people as a quick send-off! :>" 
                     },
                     "what kind of currency is there in this game?\nthere are two main types:": {
                         "coins": "earned when a new baby is born\nused for **frickery**",
-                        "skullpoints": "earned when someone dies / in the afterlife minigame\nused for **upgrades**"
+                        "skullpoints": "earned when someone dies / in the afterlife minigame\nused for **upgrades**" 
                     },
-                    "what if my progression is too slow?\nyou can always buy upgrades from the upgrade shop using skullpoints!": {},
+                    "what if my progression is too slow?\nyou can always buy upgrades from the upgrade shop using skullpoints!": {}, 
                     "bonus tips\nyou'll probably need these, thank me later": {
-                        "lifespan": "the lifespan of your first few people will be generally very short, so make sure you're active especially in the first few days!",
-                        "upgrades": "these help a lot with the progression, especially in later stages when the population stops mutating so rapidly.",
-                        "afterlife": "the afterlife minigame gives you a lot of skullpoints and helps with the progression too.",
-                        "selection": "selection has a similar reward to afterlife, but it also boosts your hatchery (and thus your population) due to the better gene pool. so remember to do it regularly!"
+                        "lifespan": "the lifespan of your first few people will be generally very short, so make sure you're active especially in the first few days!", 
+                        "upgrades": "these help a lot with the progression, especially in later stages when the population stops mutating so rapidly.", 
+                        "afterlife": "the afterlife minigame gives you a lot of skullpoints and helps with the progression too.", 
+                        "selection": "selection has a similar reward to afterlife, but it also boosts your hatchery (and thus your population) due to the better gene pool. so remember to do it regularly!" 
                     }
                 }
             case "commands":
                 help = {
                     "the main game\nsee your population and watch it expand": {
-                        "population": "view population (default: top 25 people in gene quality).\n\n`bottomfirst`: view reverse ranking\n`sort_by_serial`: rank by (low) serial instead\n`full`: see up to 250 people",
-                        "hatchery": "view your hatchery (shows all your eggs).\n\n`level + 1` slots in total\ngain 1 egg every `5 * level` minutes (without upgrades)"
+                        "population": "view population (default: top 25 people in gene quality).\n\n`bottomfirst`: view reverse ranking\n`sort_by_serial`: rank by (low) serial instead\n`full`: see up to 250 people", 
+                        "hatchery": "view your hatchery (shows all your eggs).\n\n`level + 1` slots in total\ngain 1 egg every `5 * level` minutes (without upgrades)" 
                     },
                     "population control\nreally really really unnatural wae": {
-                        "frickery": "force two people to instantly procreate as many babies as you want (and can), for 5 * level coins per baby.\n\n`person1`, `person2`: the serial numbers of the two people who you would like to reproduce (or `max` to get the people with the best genes)\n`times`: number of times you would like the people to reproduce (or `max` for the maximum number of times)",
-                        "selection": "purge all people where both genes are a certain tier or below. only all people with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for people with both slots Z and below)\nyou will get one skullpoint per person killed.\n\n`gene`: all people with both genes with this tier or below will be killed."
+                        "frickery": "force two people to instantly procreate as many babies as you want (and can), for 5 * level coins per baby.\n\n`person1`, `person2`: the serial numbers of the two people who you would like to reproduce (or `max` to get the people with the best genes)\n`times`: number of times you would like the people to reproduce (or `max` for the maximum number of times)", 
+                        "selection": "purge all people where both genes are a certain tier or below. only all people with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for people with both slots Z and below)\nyou will get one skullpoint per person killed.\n\n`gene`: all people with both genes with this tier or below will be killed." 
                     },
                     "the dead people\nbecause we're not done with them yet!": {
                         "cemetery": "just `/population` but for the dead people.",
@@ -347,7 +439,7 @@ class helpdropdown(discord.ui.Select):
                         "help": "this command!",
                         "upgrade": "view and buy upgrades! the currency used here is skullpoints.",
                         "me": "view your profile and some stats.",
-                        "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n'newvalue': the new url / bio"
+                        "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n'newvalue': the new url / bio" 
                     }
                 }
             case "numbers":
@@ -363,21 +455,24 @@ class helpdropdown(discord.ui.Select):
             case "afterlife":
                 help = {
                     "afterlife\nsending off the dead people!": {
-                        "what kind of game is this?": "afterlife is somewhat a turn-based game. in each turn, the user and enemy can choose to either attack or heal.",
-                        "you vs. the enemy": "you will be playing as a 'queue' of corpses who still have a bit of life left in them to fight. the opponent is a randomly generated 'queue' of similar corpses based on your own dead population.",
-                        "attacking and healing": "each player can either attack (for attack stat ± 1) or heal (for enemy attack stat / 2 ± 1). the attack and initial health stat for each player is based on their left and right genes respectively.",
-                        "clearing the queue": "when one corpse 'dies' in any 'queue', we move on to the next corpse as the previous corpse is now permanently dead (if from your side) and will not be seen again. oh well, at least they lived their last days fruitfully.",
-                        "winning the game": "whoever has their queue clear first wins. if both queues become clear at the same time, it's a tie.",
-                        "skullpoints": "you also get skullpoints for every enemy corpse you kill! this is based on the value of their genes (see the numbers section for more info)."
+                        "what kind of game is this?": "afterlife is somewhat a turn-based game. in each turn, the user and enemy can choose to either attack or heal.", 
+                        "you vs. the enemy": "you will be playing as a 'queue' of corpses who still have a bit of life left in them to fight. the opponent is a randomly generated 'queue' of similar corpses based on your own dead population.", 
+                        "attacking and healing": "each player can either attack (for attack stat ± 1) or heal (for enemy attack stat / 2 ± 1). the attack and initial health stat for each player is based on their left and right genes respectively.", 
+                        "clearing the queue": "when one corpse 'dies' in any 'queue', we move on to the next corpse as the previous corpse is now permanently dead (if from your side) and will not be seen again. oh well, at least they lived their last days fruitfully.", 
+                        "winning the game": "whoever has their queue clear first wins. if both queues become clear at the same time, it's a tie.", 
+                        "skullpoints": "you also get skullpoints for every enemy corpse you kill! this is based on the value of their genes (see the numbers section for more info)." 
                     }
                 }
             case "genes":
                 help = {
-                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {},
+                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {}, 
                 }
                 for x in range(5):
                     lgs = list(genes.keys())
-                    help[f"tier {5-x}\n{emojify(lgs[x*5])} to {emojify(lgs[x*5+4])}"] = {emojify(x): genes[x]["theme"] for x in lgs[x*5:x*5+5]}
+                    start = emojify(lgs[x*5])
+                    end = emojify(lgs[x*5+4])
+                    ndic = {emojify(y): genes[y]["theme"] for y in lgs[x*5:x*5+5]}
+                    help[f"tier {5-x}\n{start} to {end}"] = ndic 
                 help[f"tier 0\n{emojify('A')}"] = {emojify("A"): genes["A"]["theme"]} 
             case _:
                 help = {}
@@ -466,8 +561,21 @@ def embedlen(embed): #copied from stackoverflow
     return len(total)
 
 def unlock(gene):
-    return discord.Embed(title=f"you've unlocked {emojify(gene)}!", description=(f"you now can run `/selection`" + (" again " if gene != "U" else " ") + f"and kill off everyone with {emojify(alpha[max(alpha.index(gene)-5, 0)])} or below for both genes.") if alpha.index(gene) >= 5 and alpha.index(gene) <= 20 else "keep grinding!")
-
+    if alpha.index(gene) >= 5:
+        kill = emojify(alpha[max(alpha.index(gene)-5, 0)])
+        desc = f"you now can run `/selection`"
+        if gene != "U":
+            desc += " again " 
+        else:
+            desc += " "
+        desc += f"and kill off everyone with {kill} or below for both genes." 
+    else:
+        desc = "keep grinding!"
+    
+    return discord.Embed(
+        title=f"you've unlocked {emojify(gene)}!", 
+        description=desc 
+    )
 def autodie(id):
     data = imdata(id)
     for x in data["population"]:
@@ -503,14 +611,24 @@ async def sendhelp(interaction, help):
     embeds = []
 
     for x, y in help.items():
-        embeds.append(discord.Embed(title = x.split("\n")[0], description = x.split("\n")[1]))
+        embeds.append(discord.Embed(
+            title = x.split("\n")[0],
+            description = x.split("\n")[1]
+        )) 
         for c, h in y.items():
             embeds[-1].add_field(name = c, value = h, inline = True)
 
     await interaction.followup.send(embeds=embeds, view=helpview())
 
 def emojify(gs):
-    return "".join([f"<:gene{x}:{genes[x]['emoji']}>" if 'emoji' in genes[x] else x for x in gs]) 
+    return "".join([
+        f"<:gene{x}:{genes[x]['emoji']}>" 
+        if 'emoji' in genes[x] else x 
+        for x in gs
+    ]) 
+
+def log(com, int):
+    print(f"/{com} was used in {int.channel} ({int.guild}) by {int.user}.")
 
 # constants
 alpha = "ZYXWVUTSRQPONMLKJIHGFEDCBA"
@@ -560,7 +678,7 @@ initdata = {
 }
 upgs = {
     "mc5+": ["increase mutation chance by 5%", "mutation chance increased by"],
-    "hwt5-": ["reduce hatchery waiting time for each egg by 5%", "hatchery waiting time for each egg reduced by"],
+    "hwt5-": ["reduce hatchery waiting time for each egg by 5%", "hatchery waiting time for each egg reduced by"], 
     "fp5-": ["reduce fuckery price by 5%", "fuckery price reduced by"]
 }
 objects = {
