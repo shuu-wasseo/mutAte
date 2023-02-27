@@ -5,7 +5,6 @@ import os, discord, math
 from discord import app_commands
 from typing import Optional
 from dotenv import load_dotenv
-from random import randint, choice
 from datetime import timedelta 
 from arrow import arrow, get
 from discord_timestamps import format_timestamp, TimestampType
