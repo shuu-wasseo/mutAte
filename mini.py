@@ -724,13 +724,34 @@ genes = {
         'theme': 'frost', 
         'emoji': '1076354618667323443'
     }, 
-    'Q': {'theme': 'wind'}, 
-    'P': {'theme': 'thunder'}, 
-    'O': {'theme': 'blood'}, 
-    'N': {'theme': 'poison'}, 
-    'M': {'theme': 'acid'},
-    'L': {'theme': 'amber'}, 
-    'K': {'theme': 'steel'}, 
+    'Q': {
+        'theme': 'wind',
+        'emoji': '1078510559533744210'
+    }, 
+    'P': {
+        'theme': 'thunder',
+        'emoji': '1078713662522544149'
+    }, 
+    'O': {
+        'theme': 'blood',
+        'emoji': '1078995994244546661'
+    }, 
+    'N': {
+        'theme': 'poison',
+        'emoji': '1082270377029410846'
+    }, 
+    'M': {
+        'theme': 'acid',
+        'emoji': '1080751654921584700'
+    },
+    'L': {
+        'theme': 'amber',
+        'emoji': '1081900010733568010'
+    }, 
+    'K': {
+        'theme': 'steel',
+        'emoji': '1082264393779269662'
+    }, 
     'J': {'theme': 'gold'}, 
     'I': {'theme': 'flame'}, 
     'H': {'theme': 'magma'},
