@@ -655,6 +655,15 @@ def log(com, int):
 # constants
 alpha = "ZYXWVUTSRQPONMLKJIHGFEDCBA"
 firstgenes = newgenes("ZZ", "ZZ")
+
+upgs = {
+    "mc5+": ["increase mutation chance by 5%", "mutation chance increased by"],
+    "hwt5-": ["reduce hatchery waiting time for each egg by 5%", "hatchery waiting time for each egg reduced by"], 
+    "fp5-": ["reduce frickery price by 5%", "frickery price reduced by"],
+    "rp1+": ["increase research points per vessel by 1", "research points per vessel increased by"],
+    "sl1-": ["reduce selection limit by 1 (min 1)", "selection limit reduced by"]
+}
+
 initdata = {
     "level": 1,
     "currency": {
@@ -688,29 +697,20 @@ initdata = {
     "lastegg": arrow.Arrow.now(),
     "hatchery": [],
     "cemetery": [],
-    "upgrades": {
-        "mc5+": 0,
-        "hwt5-": 0,
-        "fp5-": 0
-    },
+    "upgrades": {u: 0 for u in upgs.keys()},
     "profile": {
         "bio": "",
         "image": ""
     }
 }
-upgs = {
-    "mc5+": ["increase mutation chance by 5%", "mutation chance increased by"],
-    "hwt5-": ["reduce hatchery waiting time for each egg by 5%", "hatchery waiting time for each egg reduced by"], 
-    "fp5-": ["reduce frickery price by 5%", "frickery price reduced by"],
-    "rp1+": ["increase research points per vessel by 1", "research points per vessel increased by"],
-    "sl1-": ["reduce selection limit by 1 (min 1)", "selection limit reduced by"]
-}
+
 objects = {
     "population": vessel,
     "hatchery": egg,
     "cemetery": fighter,
     "enemies": fighter
 }
+
 genes = {
     'Z': {
         'theme': 'ashes', 
