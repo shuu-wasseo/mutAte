@@ -45,6 +45,171 @@ async def help(interaction):
     help = {"help!\npick an option to proceed": {}}
 
     await mini.sendhelp(interaction, help)
+    
+class afterlifestart(discord.ui.View):
+    def __init__(self, id):
+        super().__init__()
+        self.id = id
+
+    @discord.ui.button(label="let's begin!",style=discord.ButtonStyle.green)
+    async def start(self, interaction, button):
+        if interaction.user.id == self.id:
+            data = mini.imdata(interaction.user.id)
+            cemetery = data["cemetery"]
+            avg = [[mini.value(x["genes"][y]) for x in cemetery] for y in range(2)]
+            avg = [mini.alpha[int(sum(x)/len(x))] for x in avg]
+
+            embed = discord.Embed(title="what's after life?")
+            embed.add_field(name="number of dormant vessels", value=len(cemetery))
+            embed.add_field(name="average genes", value=''.join(avg))
+            await interaction.response.send_message(embed=embed)
+
+            cemetery = [mini.fighter(x["genes"]) for x in cemetery]
+            enemies = mini.sample(cemetery, len(cemetery))
+            data = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(data, id=self.id, game=True)
+
+            gdata = mini.imdata(self.id, game=True)
+            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            user = interaction.user
+            embed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s afterlife research :skull:" 
+            ) 
+            battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+            for warrior in battlefield:
+                fighterobj = battlefield[warrior]
+                embed.add_field(
+                    name=warrior, 
+                    value=f"{mini.emojify(fighterobj['genes'])}\n"
+                    + f":punch: {fighterobj['attack']}\n"
+                    + f":heart: {fighterobj['health']}" 
+                ) 
+            gdata = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(gdata, id=self.id, game=True)
+            await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+
+class afterlifeview(discord.ui.View):
+    def __init__(self, id):
+        super().__init__()
+        self.id = id
+
+    def turn(self, cemetery, enemies, action = ""): 
+        myact = ""
+        data = mini.imdata(id=self.id)
+        num = 0
+        if action == "attack":
+            attack = cemetery[0]["attack"]
+            num = mini.randint(attack-1, attack+1)
+            enemies[0]["health"] -= num
+            if enemies[0]["health"] <= 0:
+                data["currency"]["researchpoints"] += mini.value(enemies[0]["genes"]) * (data["upgrades"]["rp1+"] + 1)
+        elif action == "heal":
+            healing = int(enemies[0]["attack"] / 2)
+            num = mini.randint(healing-1, healing+1)
+            cemetery[0]["health"] += num
+        myact = f"{action}(s) for {num} :heart:"
+        mini.exdata(data, id=self.id, game=True)
+        return myact, cemetery, enemies
+
+    async def action(self, action, interaction):
+        await interaction.response.defer()
+        data = mini.imdata(id=self.id, game=True)
+        maing = mini.imdata(id=self.id)
+        cemetery, enemies = data["cemetery"], data["enemies"]
+    
+        if [] in [cemetery, enemies]:
+            title, description = "", ""
+            if [cemetery, enemies] == [[], []]:
+                title = "it's a tie!"
+                description = f"oh well. at least you still got research points." 
+            elif cemetery == []:
+                title = "you lost."
+                description = f"oh well. at least you still got research points," 
+            elif enemies == []:
+                title = "you won!"
+                description = "slay! enjoy your new research points!"
+            await interaction.followup.send(embed=discord.Embed(
+                title=title, description=description
+            )) 
+            mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+            maing["cemetery"] = []
+            mini.exdata(maing, id=self.id)
+        else:
+            myact, cemetery, enemies = self.turn(
+                cemetery, enemies, 
+                action=action
+            )
+            youract, enemies, cemetery = self.turn(
+                enemies, cemetery, 
+                action=mini.choice(["attack", "heal"]
+            )) 
+
+            embed = discord.Embed(title=f"you {action}!", description="")
+            desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
+            data = {"cemetery": cemetery, "enemies": enemies}
+            for x in data:
+                if data[x][0]["health"] <= 0:
+                    val = mini.value(data[x][0]["genes"]) * (data["upgrades"]["rp1+"] + 1)
+                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
+                    desc += (f"(and you got {val} research points!)" if x != "cemetery" else "") + "\n" 
+                    maing["currency"]["researchpoints"] += val
+                    data[x] = data[x][1:]
+                    if x == "cemetery":
+                        maing[x] = maing[x][1:]
+            mini.exdata(maing, id=self.id)
+            mini.exdata(data, id=self.id, game=True)
+            embed.description = desc
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+            gdata = mini.imdata(self.id, game=True)
+            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            user = interaction.user
+            embed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s afterlife research :skull:"
+            ) 
+            try:
+                battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+            except:
+                title, description = "", ""
+                if [cemetery, enemies] == [[], []]:
+                    title = "it's a tie!"
+                    description = f"oh well. at least you still got research points." 
+                elif cemetery == []:
+                    title = "you lost."
+                    description = f"oh well. at least you still got research points," 
+                elif enemies == []:
+                    title = "you won!"
+                    description = "slay! enjoy your new research points!"
+                await interaction.followup.send(embed=discord.Embed(
+                    title=title, description=description
+                ))
+                mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+                return
+            for warrior in battlefield:
+                fighterobj = battlefield[warrior]
+                left = len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])
+                embed.add_field(
+                    name=warrior, 
+                    value=f"{left} left\n{mini.emojify(fighterobj['genes'])}\n"
+                    + f":punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}") 
+            try:
+                msg = gamemsg[self.id]
+                await msg.edit(embed=embed, view=afterlifeview(self.id))
+            except:
+                msg = await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+                gamemsg[self.id] = msg
+            gdata = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(gdata, id=self.id, game=True)
+
+    @discord.ui.button(label="attack",style=discord.ButtonStyle.green)
+    async def attack(self, interaction, button):
+        if interaction.user.id == self.id:
+            await self.action("attack", interaction)
+
+    @discord.ui.button(label="heal",style=discord.ButtonStyle.green)
+    async def heal(self, interaction, button):
+        if interaction.user.id == self.id:
+            await self.action("heal", interaction)
 
 # the main game
 @bot.tree.command(name="population", description="see your population")
@@ -69,26 +234,29 @@ async def population(
     if bottomfirst:
         population = list(reversed(population))
 
-    people = [
+    vessels = [
         population[25*x:min(25*(x+1), len(population))] 
         for x in range(math.ceil(len(population)/25))
     ]       
     embeds = []
     user = interaction.user
-    for x in range(len(people)):
+    for x in range(len(vessels)):
         embeds.append(discord.Embed(
             title=f"{user.display_name} ({user.name})'s population :people_holding_hands:",
-            description=f"page {x+1} of {len(people)}"
+            description=f"page {x+1} of {len(vessels)}"
         ))       
-        for p in people[x]:
+        for p in vessels[x]:
             embeds[-1].add_field(
-                name=f"person {p.serial} ({mini.emojify(p.genes)})", 
-                value=f"parents: {''.join(p.parents)}\n" 
-                + "death {format_timestamp(p.deathtime, TimestampType.RELATIVE)}"  
+                name=f"vessel {p.serial} ({mini.emojify(p.genes)})", 
+                value=f"parents: {', '.join([str(p) for p in p.parents])}\n" 
+                + f"death {format_timestamp(p.deathtime, TimestampType.RELATIVE)}"  
             )       
     
     if not full:
         embeds = [embeds[0]]
+        
+    while sum(mini.embedlen(e) for e in embeds) > 6000:
+        embeds = embeds[:-1]
 
     await interaction.followup.send(embeds=embeds)
 
@@ -107,10 +275,16 @@ async def hatchery(interaction):
     population = data.population
     registered = data.registered
     limit = data.level
+    
+    for egg in hatchery:
+        try:
+            get(egg.hatchtime)
+       	except:
+            egg.hatchtime = arrow.Arrow.now()
 
     try:
         nextegg = max(get(egg.hatchtime) for egg in hatchery)           
-        nextegg = timedelta(seconds=5*limit * (100-data.upgrades["hwt5-"]*5) / 100)
+        nextegg = arrow.Arrow.now() + timedelta(seconds=5*limit * (100-data.upgrades["hwt5-"]*5) / 100)
     except:
         nextegg = arrow.Arrow.now()
 
@@ -139,7 +313,7 @@ async def hatchery(interaction):
             embed.add_field(
                 name=f"slot {x+1}" 
                 + (" :hatching_chick:" if e.hatchtime < arrow.Arrow.now() else " :egg:"), 
-                value=f"**person {e.serial}\n"
+                value=f"**vessel {e.serial}\n"
                 + f"mutations: {e.mutation}**\n"
                 + f"parents: {e.parents[0]}, {e.parents[1]}\n"
                 + f"hatching {format_timestamp(e.hatchtime, TimestampType.RELATIVE)}" 
@@ -156,7 +330,7 @@ async def hatchery(interaction):
 
 # population control
 @bot.tree.command(name="frickery", description="frickery")
-async def frickery(interaction, person1: str, person2: str, times: str):
+async def frickery(interaction, vessel1: str, vessel2: str, times: str):
     mini.autodie(interaction.user.id)
 
     await interaction.response.defer()
@@ -164,8 +338,8 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     mini.log("frickery", interaction) 
 
     data = mini.imdata(id=interaction.user.id)
-    discovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y)
-    parents = [person1, person2] 
+    discovered = max(mini.alpha.index(x) for y in data["discovered"] for x in y)
+    parents = [vessel1, vessel2] 
     try:
         parents = [
             (
@@ -184,7 +358,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     ncoins = 0
     newg = []
     children = []
-    embeds = [discord.Embed(title="frickery complete! :hot_face:")]
+    embeds = [discord.Embed(title="frickery complete! :baby_chick:")]
     price = 5 * data["level"] * (100-data["upgrades"]["fp5-"]*5)/100
 
     if times == "max":
@@ -225,7 +399,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
             arrow.Arrow.now(), 
             genes=genes[0], mutation=genes[1]
         ) 
-        data["population"].append(mini.person(new.serial, new.parents, genes=new.genes))
+        data["population"].append(mini.vessel(new.serial, new.parents, genes=new.genes))
         data["registered"] += 1
         children.append(new)
         ncoins += sum([mini.value(g) for g in new.genes])
@@ -239,7 +413,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     )) 
     for x in range(len(children)): 
         new = children[x] 
-        nname = f':baby: person {new.serial} {mini.emojify(new.genes)}'
+        nname = f':baby: vessel {new.serial} {mini.emojify(new.genes)}'
         ndesc = f'\n**mutations: {new.mutation}**'
         if sum(mini.embedlen(embed) for embed in embeds) + len(nname + ndesc) >= 6000: 
             break
@@ -258,7 +432,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
     else:
         embeds[0].description += "new combos: " + ", ".join(newg)
 
-    data["totalpeople"] += atimes 
+    data["totalvessels"] += atimes 
     initlevel = data["level"]
     while (data["level"] + 1) * (data["level"] + 2) / 2 <= len(data["discovered"]):
         data["level"] += 1
@@ -277,7 +451,7 @@ async def frickery(interaction, person1: str, person2: str, times: str):
             description=f"you've leveled up to level {data['level']}!"
         ))
 
-    ndiscovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y)
+    ndiscovered = max(mini.alpha.index(x) for y in data["discovered"] for x in y)
     if ndiscovered < discovered:
         await interaction.followup.send(
             embed=mini.unlock(mini.alpha[ndiscovered]), 
@@ -291,53 +465,63 @@ async def selection(interaction, gene: str):
     await interaction.response.defer()
 
     mini.log("frickery", interaction)
+    
+    data = mini.imdata(id=interaction.user.id)
+    
+    discovered = max(mini.alpha.index(x) for y in data["discovered"] for x in y) 
+    print(discovered)
+
+    sel = 5 - data["upgrades"]["sl1-"]
 
     try:
-        mini.alpha.index(gene)
+        pos = mini.alpha.index(gene)
     except:
         if gene != "max":
             await interaction.followup.send(embed=mini.error_embed("genes"))
             return
-
-    data = mini.imdata(id=interaction.user.id)
-    
-    discovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y) 
+    else:
+        if discovered < sel:
+            await interaction.followup.send(embed=mini.error_embed("lowgenes"))
+            return
+        elif discovered - pos < sel:
+            await interaction.followup.send(embed=mini.error_embed("highgenes"))
+            return
 
     try:
         if gene == "max":
-            remove = discovered+5
+            remove = discovered - sel
         else:
-            remove = max(discovered+5, mini.alpha.index(gene))
+            remove = max(discovered - sel, mini.alpha.index(gene))
     except:
         await interaction.followup.send("ha you thought")
     else:
         sizes = {p: len(data[p]) for p in ["population", "hatchery"]}
         for p in ["population", "hatchery"]:
             ndata = []
-            for person in data[p]:
-                rmable = [mini.alpha.index(x) >= remove for x in person["genes"]]
+            for vessel in data[p]:
+                rmable = [mini.alpha.index(x) <= remove for x in vessel["genes"]]
                 if rmable.count(True) != len(rmable):
-                    ndata.append(person)
+                    ndata.append(vessel)
             data["cemetery"] += [x for x in data[p] if x not in ndata]
             data[p] = ndata
-        skpoints = sum(sizes[x] - len(data[x]) for x in sizes)
+        skpoints = sum(sizes[x] - len(data[x]) for x in sizes) * (data["upgrades"]["rp1+"] + 1)
         rm = mini.alpha[remove]
         await interaction.followup.send(embed=discord.Embed(
             title = f"(un)natural selection :skull: (both genes {rm} and below)", 
-            description = f"you got {skpoints} skullpoints.\n" 
+            description = f"you got {skpoints} research points.\n" 
             + "\n".join([f"{x}: {sizes[x]} :arrow_right: {len(data[x])}" for x in sizes]) 
         ))
-        data["currency"]["skullpoints"] += skpoints
+        data["currency"]["researchpoints"] += skpoints
         mini.exdata(data, id=interaction.user.id)
 
-        ndiscovered = min(mini.alpha.index(x) for y in data["discovered"] for x in y)
+        ndiscovered = max(mini.alpha.index(x) for y in data["discovered"] for x in y)
         if ndiscovered < discovered:
             await interaction.followup.send(
                 embed=mini.unlock(mini.alpha[ndiscovered]), 
                 ephemeral=True
             ) 
 
-# dead people
+# dormant vessels
 @bot.tree.command(name="cemetery", description="view your cemetery")
 async def cemetery(
     interaction, 
@@ -359,21 +543,21 @@ async def cemetery(
     if bottomfirst:
         cemetery = list(reversed(cemetery))
 
-    people = [
+    vessels = [
         cemetery[25*x:min(25*(x+1), len(cemetery))] 
         for x in range(math.ceil(len(cemetery)/25))
     ] 
     embeds = []
-    for x in range(len(people)):
+    for x in range(len(vessels)):
         embeds.append(discord.Embed(
             title=f"{interaction.user.display_name} ({interaction.user.name})'s"
             + "cemetery :people_holding_hands:", 
-            description=f"page {x+1} of {len(people)}"
+            description=f"page {x+1} of {len(vessels)}"
         )) 
-        for p in people[x]:
+        for p in vessels[x]:
             embeds[-1].add_field(
-                name=f"person {p.serial} ({mini.emojify(p.genes)}) :skull:", 
-                value=f"parents: {', '.join(p.parents)}" 
+                name=f"vessel {p.serial} ({mini.emojify(p.genes)}) :skull:", 
+                value=f"parents: {', '.join([str(x) for x in p.parents])}" 
             ) 
     
     if not full:
@@ -381,7 +565,7 @@ async def cemetery(
 
     await interaction.followup.send(embeds=embeds)
 
-@bot.tree.command(name="afterlife", description="get rid of the dead people")
+@bot.tree.command(name="afterlife", description="research the dormant vessels")
 async def afterlife(interaction):
     mini.autodie(interaction.user.id)
     
@@ -396,7 +580,7 @@ async def afterlife(interaction):
 
     await interaction.followup.send(
         embed=embed, 
-        view=mini.afterlifestart(interaction.user.id)
+        view=afterlifestart(interaction.user.id)
     ) 
 
 # upgrade commands
@@ -409,11 +593,12 @@ async def upgrades(interaction):
     mini.log("upgrades", interaction)
 
     data = mini.imdata(id=interaction.user.id)
-    skullpoints = data['currency']['skullpoints']
+    researchpoints = data['currency']['researchpoints']
 
     embed = discord.Embed(
         title=f"{interaction.user.display_name} ({interaction.user.name})'s upgrades", 
-        description=f"welcome to the upgrade shop!\nyou have {skullpoints} skullpoints." 
+        description=f"welcome to the upgrade shop!\nyou have {researchpoints} research points."
+        + f"\nyou get {data['upgrades']['rp1+'] + 1} research points per vessel."
     ) 
 
     for u in data["upgrades"]:
@@ -423,7 +608,7 @@ async def upgrades(interaction):
             value=f"**{mini.upgs[u][0]}**\n"
             + f"currently {u[-1]}{count*5}%\n"
             + f"next {u[-1]}{(count+1)*5}%\n"
-            + f"costs {5**count} skullpoints"
+            + f"costs {5**count} research points"
         ) 
 
     await interaction.followup.send(
@@ -458,10 +643,10 @@ async def profile(interaction):
     embed.set_thumbnail(url=interaction.user.avatar)
     embed.set_image(url=image)
 
-    for x in ["level", "total people"]:
+    for x in ["level", "total vessels"]:
         embed.add_field(name=x, value=data["".join([y for y in x if y != " "])])
 
-    for c in ["coins", "skullpoints"]:
+    for c in ["coins", "researchpoints"]:
         embed.add_field(
             name=c, 
             value=data["currency"][
@@ -524,7 +709,7 @@ async def editprof(interaction, updating: str, newvalue: str):
                 if updating == "bio" 
                 else f"your {updating} has been updated!"
             ) 
-            + "\ncheck `/viewprofile` to see how it looks!") 
+            + "\ncheck `/me` to see how it looks!") 
     else:
         await interaction.followup.send(embed=mini.error_embed("variable"))
         return
@@ -543,3 +728,4 @@ async def on_ready():
     await bot.setup_hook()
 
 bot.run(TOKEN)
+

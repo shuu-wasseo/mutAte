@@ -9,28 +9,28 @@ class user:
         self.level = data["level"]
         self.currency = data["currency"]
         self.prestige = data["prestige"]
-        self.totalpeople = data["totalpeople"]
+        self.totalvessels = data["totalvessels"]
         self.discovered = data["discovered"]
         self.registered = data["registered"]
         self.population = [
-            person(
+            vessel(
                 p["serial"], p["parents"], genes=p["genes"]
             ) for p in data["population"]
         ] 
-        self.lastegg = get(data["lastegg"], tzinfo="Asia/Singapore")
+        self.lastegg = get(data["lastegg"])
         self.hatchery = [
             egg(
-                p["serial"], p["parents"], get(p["hatchtime"], tzinfo="Asia/Singapore"), 
+                p["serial"], p["parents"], get(p["hatchtime"]), 
                 genes=p["genes"], mutation=p["mutation"]
             ) for p in data["hatchery"]
         ] 
         self.cemetery = [
-            person(p["serial"], p["parents"], genes=p["genes"]) 
+            vessel(p["serial"], p["parents"], genes=p["genes"]) 
             for p in data["cemetery"]
         ] 
         self.upgrades = data["upgrades"]
 
-class person:
+class vessel:
     def __init__(self, serial, parents, genes = "", birthtime = arrow.Arrow.now()):
         self.serial = serial
         self.parents = parents
@@ -46,9 +46,9 @@ class person:
         self.birthtime = birthtime
         self.lifespan = timedelta(hours=value(self.genes[0])*12)
         self.deathtime = birthtime + self.lifespan
-        self.charisma = value(self.genes[1])
+        self.procreatechance = value(self.genes[1])
  
-class egg(person):
+class egg(vessel):
     def __init__(self, serial, parents, hatchtime, genes = "", mutation = 0):
         super().__init__(serial, parents, genes)
         self.hatchtime = hatchtime
@@ -58,8 +58,8 @@ class fighter:
     def __init__(self, genes):
         self.genes = genes
         stats = [value(x) for x in genes]
-        self.attack = randint(stats[0]-1, stats[0]+1)
-        self.health = randint(stats[1]-1, stats[1]+1)
+        self.attack = max(1, randint(stats[0]-1, stats[0]+1))
+        self.health = max(1, randint(stats[1]-1, stats[1]+1))
 
 # embeds
 class error_embed(discord.Embed):
@@ -68,6 +68,15 @@ class error_embed(discord.Embed):
         self.title = f"error! invalid {err}."
         if err == "coins":
             self.description = f"you need {int(need)} coins per egg."
+        elif err == "lowgenes":
+            self.title = "error. your genes are not rare enough."
+            self.description = f"you need to have one vessel with a gene of rarity U or higher to do selection."
+        elif err == "highgenes":
+            self.title = "error. your genes are too rare."
+            self.description = f"you haven't gone far enough in the game to select these genes!"
+        elif err == "max upgrade":
+            self.title = f"error. {err}."
+            self.description = f"you have bough the maximum amount of this upgrade (4)."
         else:
             server = "https://discord.gg/CZs6CkZZfd"
             self.description = f"check `/help` to see if your {err} is in the right format." 
@@ -93,12 +102,12 @@ class hatcheryview(discord.ui.View):
 
             for new in data["hatchery"]:
                 if arrow.Arrow.now() > get(new["hatchtime"]):
-                    data["population"].append(person(
+                    data["population"].append(vessel(
                         new["serial"], new["parents"], 
                         genes=new["genes"], birthtime=arrow.Arrow.now()
                     )) 
                     cembed.add_field(
-                        name=f':baby: person {new["serial"]} ({emojify(new["genes"])})', 
+                        name=f':baby: vessel {new["serial"]} ({emojify(new["genes"])})', 
                         value=f'**mutations: {new["mutation"]}**\n' 
                         + f'parents: {", ".join([str(x) for x in new["parents"]])}' 
                     ) 
@@ -113,7 +122,7 @@ class hatcheryview(discord.ui.View):
                 cembed.description += "new combos: " + ", ".join(newg) 
             else:
                 cembed.description += "no new combos found." 
-            data["totalpeople"] += collected
+            data["totalvessels"] += collected
             initlevel = data["level"]
             while (data["level"] + 1) * (data["level"] + 2) / 2 <= len(data["discovered"]):
                 data["level"] += 1
@@ -168,23 +177,26 @@ class upgradeview(discord.ui.View):
     def __init__(self, id):
         super().__init__()
         self.id = id
+        self.data = imdata(id=id)
 
     async def upgrade(self, interaction, upg):
         if interaction.user.id == self.id:
             data = imdata(id=interaction.user.id)
-            if data["currency"]["skullpoints"] >= 5 ** data["upgrades"][upg]:
-                data["currency"]["skullpoints"] -= 5 ** data["upgrades"][upg]
+            if data["currency"]["researchpoints"] >= 5 ** data["upgrades"][upg] and not (upg == "sl1-" and data["upgrades"][upg] >= 4):
+                data["currency"]["researchpoints"] -= 5 ** data["upgrades"][upg]
                 data["upgrades"][upg] += 1
                 exdata(data, id=interaction.user.id)
                 embed = discord.Embed(
                     title="upgrade!", 
                     description=f"you have upgraded {upg} to {upg[-1]}{data['upgrades'][upg]*5}%!"
-                ) 
+                )
+            elif (upg == "sl1-" and data["upgrades"][upg] >= 4):
+                embed = error_embed("max upgrade")
             else:
                 price = 5 ** data['upgrades'][upg]
                 embed = discord.Embed(
-                    title="not enough skullpoints :skull:", 
-                    description=f"you need {price} skullpoints to buy this. get more and try again!" 
+                    title="not enough research points :skull:", 
+                    description=f"you need {price} research points to buy this. get more and try again!" 
                 ) 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -203,6 +215,16 @@ class upgradeview(discord.ui.View):
         await self.upgrade(interaction, "fp5-")
         pass
 
+    @discord.ui.button(label="rp1+",style=discord.ButtonStyle.green)
+    async def rp1(self, interaction, button):
+        await self.upgrade(interaction, "rp1+")
+        pass
+
+    @discord.ui.button(label="sl1-",style=discord.ButtonStyle.green if self.data["upgrades"]["sl1-"] <= 4 else discord.ButtonStyle.grey)
+    async def sl1(self, interaction, button):
+        await self.upgrade(interaction, "sl1-")
+        pass
+
 class afterlifestart(discord.ui.View):
     def __init__(self, id):
         super().__init__()
@@ -217,7 +239,7 @@ class afterlifestart(discord.ui.View):
             avg = [alpha[int(sum(x)/len(x))] for x in avg]
 
             embed = discord.Embed(title="what's after life?")
-            embed.add_field(name="number of dead people", value=len(cemetery))
+            embed.add_field(name="number of dormant vessels", value=len(cemetery))
             embed.add_field(name="average genes", value=''.join(avg))
             await interaction.response.send_message(embed=embed)
 
@@ -232,7 +254,7 @@ class afterlifestart(discord.ui.View):
             embed = discord.Embed(
                 title=f"{user.display_name} ({user.name})'s afterlife :skull:" 
             ) 
-            battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
+            battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
                 embed.add_field(
@@ -259,7 +281,7 @@ class afterlifeview(discord.ui.View):
             num = randint(attack-1, attack+1)
             enemies[0]["health"] -= num
             if enemies[0]["health"] <= 0:
-                data["currency"]["skullpoints"] += value(enemies[0]["genes"])
+                data["currency"]["researchpoints"] += value(enemies[0]["genes"])
         elif action == "heal":
             healing = int(enemies[0]["attack"] / 2)
             num = randint(healing-1, healing+1)
@@ -278,13 +300,13 @@ class afterlifeview(discord.ui.View):
             title, description = "", ""
             if [cemetery, enemies] == [[], []]:
                 title = "it's a tie!"
-                description = f"oh well. at least you still got skullpoints." 
+                description = f"oh well. at least you still got research points." 
             elif cemetery == []:
                 title = "you lost."
-                description = f"oh well. at least you still got skullpoints," 
+                description = f"oh well. at least you still got research points," 
             elif enemies == []:
                 title = "you won!"
-                description = "slay!"
+                description = "slay! enjoy your new research points!"
             await interaction.followup.send(embed=discord.Embed(
                 title=title, description=description
             )) 
@@ -308,8 +330,8 @@ class afterlifeview(discord.ui.View):
                 if data[x][0]["health"] <= 0:
                     val = value(data[x][0]["genes"])
                     desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
-                    desc += (f"(and you got {val} skullpoints!)" if x != "cemetery" else "") + "\n" 
-                    maing["currency"]["skullpoints"] += val
+                    desc += (f"(and you got {val} research points!)" if x != "cemetery" else "") + "\n" 
+                    maing["currency"]["researchpoints"] += val
                     data[x] = data[x][1:]
                     if x == "cemetery":
                         maing[x] = maing[x][1:]
@@ -325,18 +347,18 @@ class afterlifeview(discord.ui.View):
                 title=f"{user.display_name} ({user.name})'s afterlife :skull:"
             ) 
             try:
-                battlefield = {"corpse": cemetery[0], "enemy": enemies[0]}
+                battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
             except:
                 title, description = "", ""
                 if [cemetery, enemies] == [[], []]:
                     title = "it's a tie!"
-                    description = f"oh well. at least you still got skullpoints." 
+                    description = f"oh well. at least you still got research points." 
                 elif cemetery == []:
                     title = "you lost."
-                    description = f"oh well. at least you still got skullpoints," 
+                    description = f"oh well. at least you still got research points," 
                 elif enemies == []:
                     title = "you won!"
-                    description = "slay!"
+                    description = "slay! enjoy your new research points!"
                 await interaction.followup.send(embed=discord.Embed(
                     title=title, description=description
                 ))
@@ -348,7 +370,7 @@ class afterlifeview(discord.ui.View):
                 embed.add_field(
                     name=warrior, 
                     value=f"{left} left\n{emojify(fighterobj['genes'])}\n"
-                    + ":punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}") 
+                    + f":punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}") 
             try:
                 msg = gamemsg[self.id]
                 await msg.edit(embed=embed, view=afterlifeview(self.id))
@@ -375,9 +397,9 @@ class helpdropdown(discord.ui.Select):
         options = {
             "introduction": "welcome to the game!",
             "commands": "so how the hell do i use this bot",
-            "numbers": "crunching some numbers (for the curious people)",
+            "numbers": "crunching some numbers (for the curious vessels)",
             "genes": "introducing every gene and its themes",
-            "afterlife": "the dead people minigame"
+            "afterlife": "the research minigame"
         }
 
         options = [
@@ -397,49 +419,51 @@ class helpdropdown(discord.ui.Select):
             case "introduction":
                 help = {
                     "welcome to the game!\nthis game is about population control.": {
-                        "some background": "recently, scientists have found two people with special genes, and these genes have superhuman potential. as of today, these genes have been found to mutate up to 25 times beyond their original state. these 25 mutations will be referred to using the letters Y to A.", 
-                        "aim of the game": "you start off with 2 people with ZZ genes. your goal is to, through population control, finally have one person with AA genes." 
+                        "how it\'s going": "years pass, and society is flourishing. very recently, a new biological breakthrough has allowed the discover of superhuman genes which can be used to help humanity. the potential of these genes are limitless, and scientists estimate that they are capable of infrequent mutation up to 25 times their original state, each mutation bringing forth new frontiers of research.", 
+                        "how do i mutate?": "the current state of technology allows for a biological construct known as a vessel. though incapable of sentience, vessels are living organisms containing two gene traits each and can undergo evolution to mutate new genes. vessels need some time to be synthesized from eggs, however. the genes vessels contain are represented by letters A-Z, Z being the original state and A being the most advanced gene.",
+                        "aim of the game": "you start off with 2 vessels with ZZ genes. your goal is to, through population control, finally have one vessel with AA genes." 
                     },
                     "how do i get someone with AA genes?\nthere are a few ways!": {
-                        "reproduction": "your people are able to produce offspring! with every offspring, there is a tiny chance of each gene mutating! slowly, you'll get better and better genes.", 
-                        "frickery": "if needed, you might be able to make two people procreate multiple babies! this is especially useful if you pick out people with the best genes as there is a higher chance that the genes of the babies will mutate!", 
-                        "selection": "to allow a better gene pool, you may be allowed to kill off people with weaker genes to increase the general quality of your population's genes." 
+                        "reproduction": "your vessels are able to synthesize offspring in the form of new vessels. every 'baby' vessel inherits its traits from its parents, and there is a tiny chance of mutation resulting in an advancement in genes! slowly, you'll get better and better genes.", 
+                        "frickery": "if needed, you are able to make your vessels manually undergo reproduction. this is especially useful if you pick out vessels with the best genes as there is a higher chance that the genes of the babies will mutate!", 
+                        "selection": "the amount of babies that can be synthesized at once is very limited. to allow for a better gene pool, you may be allowed to permanently shut down vessels with weaker genes to increase the general quality of your population's genes." 
                     },
-                    "but what about the dead people?\ndon't worry, you'll still get to see them": {
-                        "cemetery": "you can visit the cemetery to see how everyone is doing!",
-                        "afterlife minigame": "there's a little minigame involving the dead people as a quick send-off! :>" 
+                    "but what about the dormant vessels?\ndon't worry, you'll still get to see them": {
+                        "cemetery": "check out your dormant vessels! they are living a very peaceful life.",
+                        "afterlife minigame": "active vessels are VERY volatile. as such, research can only be conducted on the vessels in their 'afterlife', when they are dormant. the best way to do this is to obviously watch them fight! you will be taking control of a dormant vessel and be facing against an artificial enemy which can test their skills to the maximum." 
                     },
                     "what kind of currency is there in this game?\nthere are two main types:": {
-                        "coins": "earned when a new baby is born\nused for **frickery**",
-                        "skullpoints": "earned when someone dies / in the afterlife minigame\nused for **upgrades**" 
+                        "coins": "earned when a new baby is synthesized\nused for **frickery**",
+                        "researchpoints": "earned from research conducted when an active vessel shuts down or from the afterlife minigame\nused for **upgrades**" 
                     },
-                    "what if my progression is too slow?\nyou can always buy upgrades from the upgrade shop using skullpoints!": {}, 
+                    "what if my progression is too slow?\nyou can always buy upgrades from the upgrade shop using research points!": {}, 
                     "bonus tips\nyou'll probably need these, thank me later": {
-                        "lifespan": "the lifespan of your first few people will be generally very short, so make sure you're active especially in the first few days!", 
+                        "hatchery": "at once, only a limited amount of vessels can be synthesized at once. these baby vessels are the offspring of randomly selected vessels, so do carry out unnatural selection as to increase the quality of your gene pool.",
+                        "lifespan": "active vessels die out automatically over time! the lifespan of your first few vessels will be generally very short, so make sure you're active especially in the first few days.", 
                         "upgrades": "these help a lot with the progression, especially in later stages when the population stops mutating so rapidly.", 
-                        "afterlife": "the afterlife minigame gives you a lot of skullpoints and helps with the progression too.", 
+                        "afterlife": "the afterlife minigame gives you a lot of research points. do use it optimally. in addition, dormant vessels that undergo the minigame will unfortunately have to be destroyed.", 
                         "selection": "selection has a similar reward to afterlife, but it also boosts your hatchery (and thus your population) due to the better gene pool. so remember to do it regularly!" 
                     }
                 }
             case "commands":
                 help = {
                     "the main game\nsee your population and watch it expand": {
-                        "population": "view population (default: top 25 people in gene quality).\n\n`bottomfirst`: view reverse ranking\n`sort_by_serial`: rank by (low) serial instead\n`full`: see up to 250 people", 
+                        "population": "view population (default: top 25 vessels in gene quality).\n\n`bottomfirst`: view reverse ranking\n`sort_by_serial`: rank by (low) serial instead\n`full`: see up to 250 vessels", 
                         "hatchery": "view your hatchery (shows all your eggs).\n\n`level + 1` slots in total\ngain 1 egg every `5 * level` minutes (without upgrades)" 
                     },
                     "population control\nreally really really unnatural wae": {
-                        "frickery": "force two people to instantly procreate as many babies as you want (and can), for 5 * level coins per baby.\n\n`person1`, `person2`: the serial numbers of the two people who you would like to reproduce (or `max` to get the people with the best genes)\n`times`: number of times you would like the people to reproduce (or `max` for the maximum number of times)", 
-                        "selection": "purge all people where both genes are a certain tier or below. only all people with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for people with both slots Z and below)\nyou will get one skullpoint per person killed.\n\n`gene`: all people with both genes with this tier or below will be killed." 
+                        "frickery": "force two vessels to instantly synthesize as many babies as you want (and can), for 5 * level coins per baby.\n\n`vessel1`, `vessel2`: the serial numbers of the two vessels who you would like to reproduce (or `max` to get the vessels with the best genes)\n`times`: number of times you would like the vessels to reproduce (or `max` for the maximum number of times)", 
+                        "selection": "shut down all active vessels where both genes are a certain tier or below. only all vessels with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for vessels with both slots Z and below)\nyou will get one research point per vessel killed.\n\n`gene`: all vessels with both genes with this tier or below will be killed." 
                     },
-                    "the dead people\nbecause we're not done with them yet!": {
-                        "cemetery": "just `/population` but for the dead people.",
+                    "the dormant vessels\nbecause we're not done with them yet!": {
+                        "cemetery": "just `/population` but for the dormant vessels.",
                         "afterlife": "starts the afterlife minigame."
                     },
                     "misc\nupgrades and profiles!": {
                         "help": "this command!",
-                        "upgrade": "view and buy upgrades! the currency used here is skullpoints.",
+                        "upgrade": "view and buy upgrades! the currency used here is research points.",
                         "me": "view your profile and some stats.",
-                        "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n'newvalue': the new url / bio" 
+                        "editprofile": "edit your image or bio,\n\n`updating`: the thing you want to update (image or bio)\n`newvalue`: the new url / bio" 
                     }
                 }
             case "numbers":
@@ -447,33 +471,29 @@ class helpdropdown(discord.ui.Select):
                     "the numbers!\nif you were curious.": {
                         "base chance of mutation (%)": "25 for Z, 0 for A\n(-1 per tier)",
                         "base hatching time (min)\nfrickery price (coins)": "5 * level",
-                        "value of person's genes": "1 for Z, 26 for A for each gene\n(+1 per tier)",
+                        "value of vessel's genes": "1 for Z, 26 for A for each gene\n(+1 per tier)",
                         "lifespan (12 hours)\npower (afterlife)": "value of left gene",
-                        "charisma\nhealth (afterlife)": "value of right gene"
+                        "likelihood of procreation\nhealth (afterlife)": "value of right gene"
                     }
                 }
             case "afterlife":
                 help = {
-                    "afterlife\nsending off the dead people!": {
+                    "afterlife\nresearching the dormant vessels!": {
                         "what kind of game is this?": "afterlife is somewhat a turn-based game. in each turn, the user and enemy can choose to either attack or heal.", 
-                        "you vs. the enemy": "you will be playing as a 'queue' of corpses who still have a bit of life left in them to fight. the opponent is a randomly generated 'queue' of similar corpses based on your own dead population.", 
+                        "you vs. the enemy": "you will be playing as a 'queue' of dormant vessels who still have a bit of life left in them to fight. the opponent is a randomly generated 'queue' of combat vessels based on your own dormant population.", 
                         "attacking and healing": "each player can either attack (for attack stat ± 1) or heal (for enemy attack stat / 2 ± 1). the attack and initial health stat for each player is based on their left and right genes respectively.", 
-                        "clearing the queue": "when one corpse 'dies' in any 'queue', we move on to the next corpse as the previous corpse is now permanently dead (if from your side) and will not be seen again. oh well, at least they lived their last days fruitfully.", 
+                        "clearing the queue": "when one vessel 'dies' in any 'queue', we move on to the next vessel as the previous vessel is now destroyed and will not be seen again. oh well, at least they spent their last moments fruitfully.", 
                         "winning the game": "whoever has their queue clear first wins. if both queues become clear at the same time, it's a tie.", 
-                        "skullpoints": "you also get skullpoints for every enemy corpse you kill! this is based on the value of their genes (see the numbers section for more info)." 
+                        "researchpoints": "you also get research points for every enemy vessel you kill! this is based on the value of their genes (see the numbers section for more info)." 
                     }
                 }
             case "genes":
                 help = {
-                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {}, 
-                }
-                for x in range(5):
-                    lgs = list(genes.keys())
-                    start = emojify(lgs[x*5])
-                    end = emojify(lgs[x*5+4])
-                    ndic = {emojify(y): genes[y]["theme"] for y in lgs[x*5:x*5+5]}
-                    help[f"tier {5-x}\n{start} to {end}"] = ndic 
-                help[f"tier 0\n{emojify('A')}"] = {emojify("A"): genes["A"]["theme"]} 
+                    "the genes\nthere are a total of 26 (for now), each with its own unique theme.": {
+                        f"tier {5-x}": "\n".join(f'{emojify(y)}: {genes[y]["theme"]}' for y in alpha[x*5:x*5+5]) for x in range(5) 
+                    }
+                } 
+                help[list(help.keys())[0]]["tier 0"] = f"{emojify('A')}: {genes['A']['theme']}"
             case _:
                 help = {}
         await sendhelp(interaction, help)
@@ -488,20 +508,16 @@ class helpview(discord.ui.View):
 
 def imdata(id=None, game=False):
     data = {}
-    while 1:
-        try:
-            file = "game.json" if game else "data.json"
-            data = json.load(open(file, "r"))
-            if id:
-                try: 
-                    return data[str(id)]
-                except:
-                    data = initdata
-                    exdata(data, id=id)
-                    return data 
-            return data
-        except:
-            time.sleep(0.1)
+    for x in range(5):
+        file = "game.json" if game else "data.json"
+        data = json.load(open(file, "r"))
+        if id:
+            try:
+                return data[str(id)]
+            except:
+                data = initdata
+                exdata(data, id=id)
+                return data 
     return data
 
 def exdata(ndata, id=None, game=False):
@@ -568,7 +584,7 @@ def unlock(gene):
             desc += " again " 
         else:
             desc += " "
-        desc += f"and kill off everyone with {kill} or below for both genes." 
+        desc += f"and kill off all vessels with {kill} or below for both genes." 
     else:
         desc = "keep grinding!"
     
@@ -578,31 +594,36 @@ def unlock(gene):
     )
 def autodie(id):
     data = imdata(id)
-    for x in data["population"]:
-        if get(x["deathtime"]) <= arrow.Arrow.now():
-            data["cemetery"].append(x)
-            data["population"].remove(x)
-    exdata(data, id=id) 
+    try:
+        data["population"]
+    except:
+        print(data)
+    else:
+        for x in data["population"]:
+            if get(x["deathtime"]) <= arrow.Arrow.now():
+                data["cemetery"].append(x)
+                data["population"].remove(x)
+        exdata(data, id=id) 
 
 def parentsample(pop):
     if pop == []:
         pop = initdata["population"]
     parents = []
     for x in range(2):
-        charis = []
+        prochance = []
         for p in pop:
             try:
-                charisma = p.charisma
+                procreatechance = p.procreatechance
             except:
-                charisma = p["charisma"]
+                procreatechance = p["procreatechance"]
             try:
-                charis.append(charis[-1] + charisma)
+                prochance.append(prochance[-1] + procreatechance)
             except:
-                charis.append(charisma)
-        charis = [x/charis[-1] for x in charis]
+                prochance.append(procreatechance)
+        prochance = [x/prochance[-1] for x in prochance]
         choose = random()
-        for x in range(len(charis)):
-            if choose < charis[x]:
+        for x in range(len(prochance)):
+            if choose < prochance[x]:
                 parents.append(pop[x])
                 break
     return parents
@@ -626,6 +647,7 @@ def emojify(gs):
         if 'emoji' in genes[x] else x 
         for x in gs
     ]) 
+	
 
 def log(com, int):
     print(f"/{com} was used in {int.channel} ({int.guild}) by {int.user}.")
@@ -637,10 +659,10 @@ initdata = {
     "level": 1,
     "currency": {
         "coins": 4,
-        "skullpoints": 0
+        "researchpoints": 0
     },
     "prestige": 0,
-    "totalpeople": 2,
+    "totalvessels": 2,
     "discovered": ["ZZ"],
     "registered": 3,
     "population": [
@@ -651,7 +673,7 @@ initdata = {
             "birthtime": arrow.Arrow.now(),
             "lifespan": timedelta(hours=12),
             "deathtime": arrow.Arrow.now() + timedelta(hours=12),
-            "charisma": 1
+            "procreatechance": 1
         },
         {
             "serial": 2,
@@ -660,7 +682,7 @@ initdata = {
             "birthtime": arrow.Arrow.now(),
             "lifespan": timedelta(hours=12),
             "deathtime": arrow.Arrow.now() + timedelta(hours=12),
-            "charisma": 1
+            "procreatechance": 1
         }
     ],
     "lastegg": arrow.Arrow.now(),
@@ -679,10 +701,12 @@ initdata = {
 upgs = {
     "mc5+": ["increase mutation chance by 5%", "mutation chance increased by"],
     "hwt5-": ["reduce hatchery waiting time for each egg by 5%", "hatchery waiting time for each egg reduced by"], 
-    "fp5-": ["reduce fuckery price by 5%", "fuckery price reduced by"]
+    "fp5-": ["reduce frickery price by 5%", "frickery price reduced by"],
+    "rp1+": ["increase research points per vessel by 1", "research points per vessel increased by"],
+    "sl1-": ["reduce selection limit by 1 (min 1)", "selection limit reduced by"]
 }
 objects = {
-    "population": person,
+    "population": vessel,
     "hatchery": egg,
     "cemetery": fighter,
     "enemies": fighter
@@ -726,42 +750,53 @@ genes = {
     }, 
     'Q': {
         'theme': 'wind',
-        'emoji': '1078510559533744210'
+        'emoji': '1078502812335476756'
     }, 
     'P': {
         'theme': 'thunder',
-        'emoji': '1078713662522544149'
+        'emoji': '1078713565063688192'
     }, 
     'O': {
         'theme': 'blood',
-        'emoji': '1078995994244546661'
+        'emoji': '1085827501646938192'
     }, 
     'N': {
         'theme': 'poison',
-        'emoji': '1082270377029410846'
+        'emoji': '1080125177343508560'
     }, 
     'M': {
         'theme': 'acid',
-        'emoji': '1080751654921584700'
+        'emoji': '1080747911140343828'
     },
     'L': {
         'theme': 'amber',
-        'emoji': '1081900010733568010'
+        'emoji': '1081899477025173524'
     }, 
     'K': {
         'theme': 'steel',
-        'emoji': '1082264393779269662'
+        'emoji': '1082264329052749864'
     }, 
-    'J': {'theme': 'gold'}, 
-    'I': {'theme': 'flame'}, 
-    'H': {'theme': 'magma'},
-    'G': {'theme': 'crystals'}, 
-    'F': {'theme': 'colours'}, 
-    'E': {'theme': 'light'}, 
+    'J': {
+        'theme': 'gold',
+        'emoji': '1083344132061274122'
+    }, 
+    'I': {
+        'theme': 'flame',
+        'emoji': '1084325043435225158'
+    }, 
+    'H': {
+        'theme': 'magma',
+        'emoji': '1085827255906873364'
+    }, 
+    'G': {
+        'theme': 'crystals',
+        'emoji': '1085873444559790110'
+    }, 
+    'F': {'theme': 'light'}, 
+    'E': {'theme': 'abyss'}, 
     'D': {'theme': 'plasma'}, 
     'C': {'theme': 'gravity'}, 
     'B': {'theme': 'singularity'}, 
     'A': {'theme': 'stars'}
 }
 gamemsg = {}
-
