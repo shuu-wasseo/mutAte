@@ -20,6 +20,7 @@ intents.reactions = True
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 TOKEN = "" if not TOKEN else TOKEN
+print("token:", TOKEN)
 
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
