@@ -18,7 +18,7 @@ intents.messages = True
 intents.reactions = True
 
 load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.environ['DISCORD_TOKEN']
 TOKEN = "" if not TOKEN else TOKEN
 print("token:", TOKEN)
 
