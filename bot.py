@@ -3,7 +3,9 @@
 # load discord
 import os, discord, math
 from discord import app_commands
+from random import randint, sample
 from typing import Optional
+from pprint import pprint
 from dotenv import load_dotenv
 from datetime import timedelta 
 from arrow import arrow, get
@@ -55,38 +57,78 @@ class afterlifestart(discord.ui.View):
     async def start(self, interaction, button):
         if interaction.user.id == self.id:
             data = mini.imdata(interaction.user.id)
-            cemetery = data["cemetery"]
-            avg = [[mini.value(x["genes"][y]) for x in cemetery] for y in range(2)]
+            game = mini.imdata(interaction.user.id, game=True)
+
+            game["cemetery"] = [[z for z in x if type(z) != list] for x in game["cemetery"]]
+            avg = [[mini.value(z["genes"][y]) for x in game["cemetery"] for z in x] for y in range(2)]
             avg = [mini.alpha[int(sum(x)/len(x))] for x in avg]
+
+            #mx = maing["upgrades"]["ats1+"]
+            mx = 5
+            ncemetery = [mini.fighter(x["genes"]) for x in data["cemetery"]] + game["cemetery"]
+            cemetery = []
+            while ncemetery:
+                n = randint(1, mx)
+                cemetery.append(ncemetery[:n])
+                try:
+                    ncemetery = ncemetery[n:]
+                except:
+                    pass            
+
+            enemies = []
+            for x in cemetery:
+                x = [vars(f) if isinstance(f, mini.fighter) else f for f in x]
+                ngenes = "".join([
+                    mini.alpha[int(l)-1]
+                    for y in range(2)
+                    for l in [
+                        sum(mini.value(c["genes"][y]) for c in x if type(c) == dict) / len(x)
+                    ] 
+                ])
+                enemies.append([vars(mini.fighter(ngenes))])
+            enemies = sample(enemies, len(enemies))
 
             embed = discord.Embed(title="what's after life?")
             embed.add_field(name="number of dormant vessels", value=len(cemetery))
             embed.add_field(name="average genes", value=''.join(avg))
             await interaction.response.send_message(embed=embed)
 
-            cemetery = [mini.fighter(x["genes"]) for x in cemetery]
-            enemies = mini.sample(cemetery, len(cemetery))
-            data = {"cemetery": cemetery, "enemies": enemies}
-            mini.exdata(data, id=self.id, game=True)
+            game = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(game, id=self.id, game=True)
+            game = mini.imdata(id=self.id, game=True)
 
-            gdata = mini.imdata(self.id, game=True)
-            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
             user = interaction.user
-            embed = discord.Embed(
-                title=f"{user.display_name} ({user.name})'s afterlife research :skull:" 
+            fembed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s vessels :skull:" 
             ) 
-            battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+
+            battlefield = cemetery[0]
             for warrior in battlefield:
-                fighterobj = battlefield[warrior]
-                embed.add_field(
-                    name=warrior, 
-                    value=f"{mini.emojify(fighterobj['genes'])}\n"
-                    + f":punch: {fighterobj['attack']}\n"
-                    + f":heart: {fighterobj['health']}" 
-                ) 
-            gdata = {"cemetery": cemetery, "enemies": enemies}
-            mini.exdata(gdata, id=self.id, game=True)
-            await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+                warrior = vars(warrior)
+                fembed.add_field(
+                    name=mini.emojify(warrior["genes"]), 
+                    value=f":punch: {warrior['attack']}\n"
+                    + f":heart: {warrior['health']}" 
+                )
+            
+            eembed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s enemy :fire:" 
+            ) 
+            enemy = enemies[0][0]
+            eembed.add_field(
+                name=mini.emojify(enemy["genes"]), 
+                value=f":punch: {enemy['attack']}\n"
+                + f":heart: {enemy['health']}" 
+            )
+
+            cemetery = [[z for z in x if type(z) != list] for x in cemetery]
+            game = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(game, id=self.id, game=True)
+            msg = await interaction.followup.send(embeds=[fembed, eembed], view=afterlifeview(self.id))
+            gamemsg[self.id] = msg
+
+            data["cemetery"] = []
+            mini.exdata(game, id=self.id)
 
 class afterlifeview(discord.ui.View):
     def __init__(self, id):
@@ -98,24 +140,29 @@ class afterlifeview(discord.ui.View):
         data = mini.imdata(id=self.id)
         num = 0
         if action == "attack":
-            attack = cemetery[0]["attack"]
+            attack = sum(c["attack"] for c in cemetery[0])
             num = mini.randint(attack-1, attack+1)
-            enemies[0]["health"] -= num
-            if enemies[0]["health"] <= 0:
-                data["currency"]["researchpoints"] += mini.value(enemies[0]["genes"]) * (data["upgrades"]["rp1+"] + 1)
+            for e in enemies[0]:
+                e["health"] -= num/len(enemies[0])
+                if e["health"] <= 0:
+                    data["currency"]["researchpoints"] += mini.value(e["genes"]) * (data["upgrades"]["rp1+"] + 1)
         elif action == "heal":
-            healing = int(enemies[0]["attack"] / 2)
+            healing = int(sum(c["attack"] for c in enemies[0]) / 2)
             num = mini.randint(healing-1, healing+1)
-            cemetery[0]["health"] += num
+            for c in cemetery[0]:
+                c["health"] += num/len(cemetery[0])
         myact = f"{action}(s) for {num} :heart:"
-        mini.exdata(data, id=self.id, game=True)
+        mini.exdata(data, id=self.id)
         return myact, cemetery, enemies
 
     async def action(self, action, interaction):
         await interaction.response.defer()
         data = mini.imdata(id=self.id, game=True)
         maing = mini.imdata(id=self.id)
-        cemetery, enemies = data["cemetery"], data["enemies"]
+        
+        cemetery = data["cemetery"] 
+
+        enemies = data["enemies"]
     
         if [] in [cemetery, enemies]:
             title, description = "", ""
@@ -134,6 +181,7 @@ class afterlifeview(discord.ui.View):
             mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
             maing["cemetery"] = []
             mini.exdata(maing, id=self.id)
+
         else:
             myact, cemetery, enemies = self.turn(
                 cemetery, enemies, 
@@ -146,16 +194,23 @@ class afterlifeview(discord.ui.View):
 
             embed = discord.Embed(title=f"you {action}!", description="")
             desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
+            gdata = maing 
             data = {"cemetery": cemetery, "enemies": enemies}
+
             for x in data:
-                if data[x][0]["health"] <= 0:
-                    val = mini.value(data[x][0]["genes"]) * (data["upgrades"]["rp1+"] + 1)
+                if x == "enemies":
+                    health = data[x][0][0]["health"]
+                else:
+                    health = sum(c["health"] for c in data[x][0])
+                if health <= 0:
+                    val = mini.value(data[x][0][0]["genes"]) * (gdata["upgrades"]["rp1+"] + 1)
                     desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
                     desc += (f"(and you got {val} research points!)" if x != "cemetery" else "") + "\n" 
                     maing["currency"]["researchpoints"] += val
                     data[x] = data[x][1:]
                     if x == "cemetery":
                         maing[x] = maing[x][1:]
+
             mini.exdata(maing, id=self.id)
             mini.exdata(data, id=self.id, game=True)
             embed.description = desc
@@ -185,21 +240,39 @@ class afterlifeview(discord.ui.View):
                 ))
                 mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
                 return
+
+            user = interaction.user
+            fembed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s vessels :skull:" 
+            )
+
+            battlefield = cemetery[0]
             for warrior in battlefield:
-                fighterobj = battlefield[warrior]
-                left = len(gdata[list(gdata.keys())[list(battlefield.keys()).index(warrior)]])
-                embed.add_field(
-                    name=warrior, 
-                    value=f"{left} left\n{mini.emojify(fighterobj['genes'])}\n"
-                    + f":punch: {fighterobj['attack']}\n:heart: {fighterobj['health']}") 
+                fembed.add_field(
+                    name=mini.emojify(warrior["genes"]), 
+                    value=f":punch: {warrior['attack']}\n"
+                    + f":heart: {warrior['health']}" 
+                )
+            
+            eembed = discord.Embed(
+                title=f"{user.display_name} ({user.name})'s enemy :fire:" 
+            ) 
+            enemy = enemies[0][0]
+            eembed.add_field(
+                name=mini.emojify(enemy["genes"]), 
+                value=f":punch: {enemy['attack']}\n"
+                + f":heart: {int(enemy['health'])}" 
+            )
+
+            cemetery = [[z for z in x if type(z) != list] for x in cemetery]
+            game = {"cemetery": cemetery, "enemies": enemies}
+            mini.exdata(game, id=self.id, game=True)
             try:
                 msg = gamemsg[self.id]
-                await msg.edit(embed=embed, view=afterlifeview(self.id))
+                await msg.edit(embeds=[fembed, eembed], view=afterlifeview(self.id))
             except:
-                msg = await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
+                msg = await interaction.followup.send(embeds=[fembed, eembed], view=afterlifeview(self.id))
                 gamemsg[self.id] = msg
-            gdata = {"cemetery": cemetery, "enemies": enemies}
-            mini.exdata(gdata, id=self.id, game=True)
 
     @discord.ui.button(label="attack",style=discord.ButtonStyle.green)
     async def attack(self, interaction, button):
@@ -279,7 +352,7 @@ async def hatchery(interaction):
     for egg in hatchery:
         try:
             get(egg.hatchtime)
-       	except:
+        except:
             egg.hatchtime = arrow.Arrow.now()
 
     try:
@@ -291,11 +364,11 @@ async def hatchery(interaction):
     while len(hatchery) < limit + 1:
         parents = mini.parentsample(population)
         genes = mini.newgenes(
-            *[p.genes for p in parents],
+            *[p["genes"] for p in parents],
             upgrade=data.upgrades["mc5+"]
         ) 
         hatchery.append(mini.egg(
-            registered+1, list(sorted([p.serial for p in parents])), nextegg, 
+            registered+1, list(sorted([p["serial"] for p in parents])), nextegg, 
             genes=genes[0], mutation=genes[1]
         )) 
         nextegg += timedelta(seconds=5*limit*(100-data.upgrades["hwt5-"]*5)/100)
@@ -606,10 +679,10 @@ async def upgrades(interaction):
         embed.add_field(
             name=f"{u}", 
             value=f"**{mini.upgs[u][0]}**\n"
-            + f"currently {u[-1]}{count*5}%\n"
-            + f"next {u[-1]}{(count+1)*5}%\n"
+            + f"currently {u[-1]}" + (f"{count*5}%" if u[-2] == "5" else f"{count}") + "\n"
+            + f"currently {u[-1]}" + (f"{(count+1)*5}%" if u[-2] == "5" else f"{count+1}") + "\n"
             + f"costs {5**count} research points"
-        ) 
+        )
 
     await interaction.followup.send(
         embed=embed, 
@@ -728,4 +801,3 @@ async def on_ready():
     await bot.setup_hook()
 
 bot.run(TOKEN)
-

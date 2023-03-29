@@ -220,7 +220,7 @@ class upgradeview(discord.ui.View):
         await self.upgrade(interaction, "rp1+")
         pass
 
-    @discord.ui.button(label="sl1-",style=discord.ButtonStyle.green if self.data["upgrades"]["sl1-"] <= 4 else discord.ButtonStyle.grey)
+    @discord.ui.button(label="sl1-",style=discord.ButtonStyle.green)
     async def sl1(self, interaction, button):
         await self.upgrade(interaction, "sl1-")
         pass
@@ -526,9 +526,12 @@ def exdata(ndata, id=None, game=False):
     if id:
         for x in ndata:
             if x in objects.keys():
-                ndata[x] = [vars(p) if isinstance(p, objects[x]) else p for p in ndata[x]]
-                if x == "hatchery":
-                    ndata[x] = sorted(ndata[x], key=lambda x:x["serial"])
+                if x in ["cemetery", "enemies"] and game:
+                    ndata[x] = [[vars(p) if isinstance(p, objects[x]) else p for p in l] for l in ndata[x]]
+                else:
+                    ndata[x] = [vars(p) if isinstance(p, objects[x]) else p for p in ndata[x]]
+                    if x == ["hatchery"]:
+                        ndata[x] = sorted(ndata[x], key=lambda x:x["serial"])
             elif x == "currency":
                 ndata[x] = {y: round(ndata[x][y]) for y in ndata[x]}
     if id:
