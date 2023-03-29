@@ -801,4 +801,7 @@ async def on_ready():
     print()
     await bot.setup_hook()
 
-bot.run(TOKEN)
+try:
+    bot.run(TOKEN)
+except:
+    print(TOKEN, "bad token")
