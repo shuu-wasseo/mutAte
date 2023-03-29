@@ -60,4 +60,4 @@ jobs:
         with:
           app-name: 'mutAte'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_EE1981EC91F54E97B5751BFB3A4E922B }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
