@@ -66,6 +66,10 @@ class afterlifestart(discord.ui.View):
 
             #mx = maing["upgrades"]["ats1+"]
             mx = 5
+            for x in data["cemetery"]:
+                if type(x) == list:
+                    data["cemetery"] += x
+            data["cemetery"] = [x for x in data["cemetery"] if type(x) != list]
             ncemetery = [mini.fighter(x["genes"]) for x in data["cemetery"]] + game["cemetery"]
             cemetery = []
             while ncemetery:
@@ -105,12 +109,15 @@ class afterlifestart(discord.ui.View):
 
             battlefield = cemetery[0]
             for warrior in battlefield:
-                warrior = vars(warrior)
-                fembed.add_field(
-                    name=mini.emojify(warrior["genes"]), 
-                    value=f":punch: {warrior['attack']}\n"
-                    + f":heart: {warrior['health']}" 
-                )
+                print(warrior, type(warrior))
+                try:
+                    warrior = vars(warrior)
+                finally:
+                    fembed.add_field(
+                        name=mini.emojify(warrior["genes"]), 
+                        value=f":punch: {warrior['attack']}\n"
+                        + f":heart: {warrior['health']}" 
+                    )
             
             eembed = discord.Embed(
                 title=f"{user.display_name} ({user.name})'s enemy :fire:" 
@@ -129,7 +136,7 @@ class afterlifestart(discord.ui.View):
             gamemsg[self.id] = msg
 
             data["cemetery"] = []
-            mini.exdata(game, id=self.id)
+            mini.exdata(game, id=self.id, game=True)
 
 class afterlifeview(discord.ui.View):
     def __init__(self, id):
@@ -252,7 +259,7 @@ class afterlifeview(discord.ui.View):
                 fembed.add_field(
                     name=mini.emojify(warrior["genes"]), 
                     value=f":punch: {warrior['attack']}\n"
-                    + f":heart: {warrior['health']}" 
+                    + f":heart: {int(warrior['health'])}" 
                 )
             
             eembed = discord.Embed(
