@@ -60,28 +60,28 @@ class afterlifestart(discord.ui.View):
             data = mini.imdata(interaction.user.id)
             game = mini.imdata(interaction.user.id, game=True)
 
-            game["cemetery"] = [[z for z in x if type(z) != list] for x in game["cemetery"]]
-            avg = [[mini.value(z["genes"][y]) for x in game["cemetery"] for z in x] for y in range(2)]
+            game["graveyard"] = [[z for z in x if type(z) != list] for x in game["graveyard"]]
+            avg = [[mini.value(z["genes"][y]) for x in game["graveyard"] for z in x] for y in range(2)]
             avg = [mini.alpha[int(sum(x)/len(x))] for x in avg]
 
             #mx = maing["upgrades"]["ats1+"]
             mx = 5
-            for x in data["cemetery"]:
+            for x in data["graveyard"]:
                 if type(x) == list:
-                    data["cemetery"] += x
-            data["cemetery"] = [x for x in data["cemetery"] if type(x) != list]
-            ncemetery = [mini.fighter(x["genes"]) for x in data["cemetery"]] + game["cemetery"]
-            cemetery = []
-            while ncemetery:
+                    data["graveyard"] += x
+            data["graveyard"] = [x for x in data["graveyard"] if type(x) != list]
+            ngraveyard = [mini.fighter(x["genes"]) for x in data["graveyard"]] + game["graveyard"]
+            graveyard = []
+            while ngraveyard:
                 n = randint(1, mx)
-                cemetery.append(ncemetery[:n])
+                graveyard.append(ngraveyard[:n])
                 try:
-                    ncemetery = ncemetery[n:]
+                    ngraveyard = ngraveyard[n:]
                 except:
                     pass            
 
             enemies = []
-            for x in cemetery:
+            for x in graveyard:
                 x = [vars(f) if isinstance(f, mini.fighter) else f for f in x]
                 ngenes = "".join([
                     mini.alpha[int(l)-1]
@@ -94,11 +94,12 @@ class afterlifestart(discord.ui.View):
             enemies = sample(enemies, len(enemies))
 
             embed = discord.Embed(title="what's after life?")
-            embed.add_field(name="number of dormant vessels", value=len(cemetery))
+            embed.add_field(name="number of dormant vessels", value=len(graveyard))
             embed.add_field(name="average genes", value=''.join(avg))
+            embed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/graveyard_notext.png")
             await interaction.response.send_message(embed=embed)
 
-            game = {"cemetery": cemetery, "enemies": enemies}
+            game = {"graveyard": graveyard, "enemies": enemies}
             mini.exdata(game, id=self.id, game=True)
             game = mini.imdata(id=self.id, game=True)
 
@@ -107,9 +108,8 @@ class afterlifestart(discord.ui.View):
                 title=f"{user.display_name} ({user.name})'s vessels :skull:" 
             ) 
 
-            battlefield = cemetery[0]
+            battlefield = graveyard[0]
             for warrior in battlefield:
-                print(warrior, type(warrior))
                 try:
                     warrior = vars(warrior)
                 finally:
@@ -129,13 +129,14 @@ class afterlifestart(discord.ui.View):
                 + f":heart: {enemy['health']}" 
             )
 
-            cemetery = [[z for z in x if type(z) != list] for x in cemetery]
-            game = {"cemetery": cemetery, "enemies": enemies}
+            graveyard = [[z for z in x if type(z) != list] for x in graveyard]
+            game = {"graveyard": graveyard, "enemies": enemies}
             mini.exdata(game, id=self.id, game=True)
+            eembed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/graveyard_notext.png")
             msg = await interaction.followup.send(embeds=[fembed, eembed], view=afterlifeview(self.id))
             gamemsg[self.id] = msg
 
-            data["cemetery"] = []
+            data["graveyard"] = []
             mini.exdata(game, id=self.id, game=True)
 
 class afterlifeview(discord.ui.View):
@@ -143,12 +144,12 @@ class afterlifeview(discord.ui.View):
         super().__init__()
         self.id = id
 
-    def turn(self, cemetery, enemies, action = ""): 
+    def turn(self, graveyard, enemies, action = ""): 
         myact = ""
         data = mini.imdata(id=self.id)
         num = 0
         if action == "attack":
-            attack = sum(c["attack"] for c in cemetery[0])
+            attack = sum(c["attack"] for c in graveyard[0])
             num = mini.randint(attack-1, attack+1)
             for e in enemies[0]:
                 e["health"] -= num/len(enemies[0])
@@ -157,53 +158,54 @@ class afterlifeview(discord.ui.View):
         elif action == "heal":
             healing = int(sum(c["attack"] for c in enemies[0]) / 2)
             num = mini.randint(healing-1, healing+1)
-            for c in cemetery[0]:
-                c["health"] += num/len(cemetery[0])
+            for c in graveyard[0]:
+                c["health"] += num/len(graveyard[0])
         myact = f"{action}(s) for {num} :heart:"
         mini.exdata(data, id=self.id)
-        return myact, cemetery, enemies
+        return myact, graveyard, enemies
 
     async def action(self, action, interaction):
         await interaction.response.defer()
         data = mini.imdata(id=self.id, game=True)
         maing = mini.imdata(id=self.id)
         
-        cemetery = data["cemetery"] 
+        graveyard = data["graveyard"] 
 
         enemies = data["enemies"]
     
-        if [] in [cemetery, enemies]:
+        if [] in [graveyard, enemies]:
             title, description = "", ""
-            if [cemetery, enemies] == [[], []]:
+            if [graveyard, enemies] == [[], []]:
                 title = "it's a tie!"
                 description = f"oh well. at least you still got research points." 
-            elif cemetery == []:
+            elif graveyard == []:
                 title = "you lost."
                 description = f"oh well. at least you still got research points," 
             elif enemies == []:
                 title = "you won!"
                 description = "slay! enjoy your new research points!"
-            await interaction.followup.send(embed=discord.Embed(
-                title=title, description=description
-            )) 
-            mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
-            maing["cemetery"] = []
+
+            embed = discord.Embed(title=title, description=description)
+            await interaction.followup.send(embed=embed) 
+
+            mini.exdata({"graveyard": [], "enemies": []}, id=self.id, game=True)
+            maing["graveyard"] = []
             mini.exdata(maing, id=self.id)
 
         else:
-            myact, cemetery, enemies = self.turn(
-                cemetery, enemies, 
+            myact, graveyard, enemies = self.turn(
+                graveyard, enemies, 
                 action=action
             )
-            youract, enemies, cemetery = self.turn(
-                enemies, cemetery, 
+            youract, enemies, graveyard = self.turn(
+                enemies, graveyard, 
                 action=mini.choice(["attack", "heal"]
             )) 
 
             embed = discord.Embed(title=f"you {action}!", description="")
             desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
             gdata = maing 
-            data = {"cemetery": cemetery, "enemies": enemies}
+            data = {"graveyard": graveyard, "enemies": enemies}
 
             for x in data:
                 if x == "enemies":
@@ -212,11 +214,11 @@ class afterlifeview(discord.ui.View):
                     health = sum(c["health"] for c in data[x][0])
                 if health <= 0:
                     val = mini.value(data[x][0][0]["genes"]) * (gdata["upgrades"]["rp1+"] + 1)
-                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
-                    desc += (f"(and you got {val} research points!)" if x != "cemetery" else "") + "\n" 
+                    desc += ("you" if x == "graveyard" else "an enemy") + f" died. "
+                    desc += (f"(and you got {val} research points!)" if x != "graveyard" else "") + "\n" 
                     maing["currency"]["researchpoints"] += val
                     data[x] = data[x][1:]
-                    if x == "cemetery":
+                    if x == "graveyard":
                         maing[x] = maing[x][1:]
 
             mini.exdata(maing, id=self.id)
@@ -225,19 +227,19 @@ class afterlifeview(discord.ui.View):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
             gdata = mini.imdata(self.id, game=True)
-            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            graveyard, enemies = gdata["graveyard"], gdata["enemies"]
             user = interaction.user
             embed = discord.Embed(
                 title=f"{user.display_name} ({user.name})'s afterlife research :skull:"
             ) 
             try:
-                battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+                battlefield = {"vessel": graveyard[0], "enemy": enemies[0]}
             except:
                 title, description = "", ""
-                if [cemetery, enemies] == [[], []]:
+                if [graveyard, enemies] == [[], []]:
                     title = "it's a tie!"
                     description = f"oh well. at least you still got research points." 
-                elif cemetery == []:
+                elif graveyard == []:
                     title = "you lost."
                     description = f"oh well. at least you still got research points," 
                 elif enemies == []:
@@ -246,7 +248,7 @@ class afterlifeview(discord.ui.View):
                 await interaction.followup.send(embed=discord.Embed(
                     title=title, description=description
                 ))
-                mini.exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+                mini.exdata({"graveyard": [], "enemies": []}, id=self.id, game=True)
                 return
 
             user = interaction.user
@@ -254,7 +256,7 @@ class afterlifeview(discord.ui.View):
                 title=f"{user.display_name} ({user.name})'s vessels :skull:" 
             )
 
-            battlefield = cemetery[0]
+            battlefield = graveyard[0]
             for warrior in battlefield:
                 fembed.add_field(
                     name=mini.emojify(warrior["genes"]), 
@@ -272,8 +274,8 @@ class afterlifeview(discord.ui.View):
                 + f":heart: {int(enemy['health'])}" 
             )
 
-            cemetery = [[z for z in x if type(z) != list] for x in cemetery]
-            game = {"cemetery": cemetery, "enemies": enemies}
+            graveyard = [[z for z in x if type(z) != list] for x in graveyard]
+            game = {"graveyard": graveyard, "enemies": enemies}
             mini.exdata(game, id=self.id, game=True)
             try:
                 msg = gamemsg[self.id]
@@ -333,12 +335,21 @@ async def population(
                 + f"death {format_timestamp(p.deathtime, TimestampType.RELATIVE)}"  
             )       
     
+    if not len(embeds):
+        embeds = [
+            discord.Embed(
+                title=f"{user.display_name} ({user.name})'s population :people_holding_hands:",
+                description=f"you have no population! visit `/hatchery` to get some."
+            )
+        ]
+
     if not full:
         embeds = [embeds[0]]
         
     while sum(mini.embedlen(e) for e in embeds) > 6000:
         embeds = embeds[:-1]
 
+    embeds[-1].set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/population_notext.png")
     await interaction.followup.send(embeds=embeds)
 
 @bot.tree.command(name="hatchery", description="hatchery")
@@ -402,6 +413,7 @@ async def hatchery(interaction):
         except:
             pass
 
+    embed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/hatchery_notext.png")
     await interaction.followup.send(embed=embed, view=mini.hatcheryview(user.id)) 
  
     data = mini.imdata(interaction.user.id)
@@ -583,7 +595,7 @@ async def selection(interaction, gene: str):
                 rmable = [mini.alpha.index(x) <= remove for x in vessel["genes"]]
                 if rmable.count(True) != len(rmable):
                     ndata.append(vessel)
-            data["cemetery"] += [x for x in data[p] if x not in ndata]
+            data["graveyard"] += [x for x in data[p] if x not in ndata]
             data[p] = ndata
         skpoints = sum(sizes[x] - len(data[x]) for x in sizes) * (data["upgrades"]["rp1+"] + 1)
         rm = mini.alpha[remove]
@@ -603,8 +615,8 @@ async def selection(interaction, gene: str):
             ) 
 
 # dormant vessels
-@bot.tree.command(name="cemetery", description="view your cemetery")
-async def cemetery(
+@bot.tree.command(name="graveyard", description="view your graveyard")
+async def graveyard(
     interaction, 
     bottomfirst: Optional[bool], 
     sort_by_serial: Optional[bool], 
@@ -614,25 +626,24 @@ async def cemetery(
 
     await interaction.response.defer()
 
-    mini.log("cemetery", interaction)
+    mini.log("graveyard", interaction)
 
-    cemetery = mini.user(interaction.user.id).cemetery
-    cemetery = list(sorted(
-        cemetery, 
+    graveyard = mini.user(interaction.user.id).graveyard
+    graveyard = list(sorted(
+        graveyard, 
         key=lambda x: x.serial if sort_by_serial else -mini.value(x.genes)
     )) 
     if bottomfirst:
-        cemetery = list(reversed(cemetery))
+        graveyard = list(reversed(graveyard))
 
     vessels = [
-        cemetery[25*x:min(25*(x+1), len(cemetery))] 
-        for x in range(math.ceil(len(cemetery)/25))
+        graveyard[25*x:min(25*(x+1), len(graveyard))] 
+        for x in range(math.ceil(len(graveyard)/25))
     ] 
     embeds = []
     for x in range(len(vessels)):
         embeds.append(discord.Embed(
-            title=f"{interaction.user.display_name} ({interaction.user.name})'s"
-            + "cemetery :people_holding_hands:", 
+            title=f"{interaction.user.display_name} ({interaction.user.name})'s graveyard :people_holding_hands:", 
             description=f"page {x+1} of {len(vessels)}"
         )) 
         for p in vessels[x]:
@@ -644,6 +655,7 @@ async def cemetery(
     if not full:
         embeds = [embeds[0]]
 
+    embeds[-1].set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/graveyard_notext.png")
     await interaction.followup.send(embeds=embeds)
 
 @bot.tree.command(name="afterlife", description="research the dormant vessels")
@@ -658,6 +670,7 @@ async def afterlife(interaction):
         title="what's after life?", 
         description="what after life nae mame strife"
     ) 
+    embed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/afterlife_notext.png")
 
     await interaction.followup.send(
         embed=embed, 
@@ -798,6 +811,10 @@ async def editprof(interaction, updating: str, newvalue: str):
     await interaction.followup.send(embed=embed)
 
     mini.exdata(data, id=interaction.user.id)
+
+@bot.tree.command(name="emojify", description="update your profile.") 
+async def emojify(interaction, inp: str):
+    await interaction.response.send_message(mini.emojify(inp))
 
 @bot.event
 async def on_ready():

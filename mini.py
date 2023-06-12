@@ -16,7 +16,7 @@ class user:
             vessel(
                 p["serial"], p["parents"], genes=p["genes"]
             ) for p in data["population"]
-        ] 
+        ]
         self.lastegg = get(data["lastegg"])
         self.hatchery = [
             egg(
@@ -24,9 +24,9 @@ class user:
                 genes=p["genes"], mutation=p["mutation"]
             ) for p in data["hatchery"]
         ] 
-        self.cemetery = [
+        self.graveyard = [
             vessel(p["serial"], p["parents"], genes=p["genes"]) 
-            for p in data["cemetery"]
+            for p in data["graveyard"]
         ] 
         self.upgrades = data["upgrades"]
 
@@ -234,27 +234,27 @@ class afterlifestart(discord.ui.View):
     async def start(self, interaction, button):
         if interaction.user.id == self.id:
             data = imdata(interaction.user.id)
-            cemetery = data["cemetery"]
-            avg = [[value(x["genes"][y]) for x in cemetery] for y in range(2)]
+            graveyard = data["graveyard"]
+            avg = [[value(x["genes"][y]) for x in graveyard] for y in range(2)]
             avg = [alpha[int(sum(x)/len(x))] for x in avg]
 
             embed = discord.Embed(title="what's after life?")
-            embed.add_field(name="number of dormant vessels", value=len(cemetery))
+            embed.add_field(name="number of dormant vessels", value=len(graveyard))
             embed.add_field(name="average genes", value=''.join(avg))
             await interaction.response.send_message(embed=embed)
 
-            cemetery = [fighter(x["genes"]) for x in cemetery]
-            enemies = sample(cemetery, len(cemetery))
-            data = {"cemetery": cemetery, "enemies": enemies}
+            graveyard = [fighter(x["genes"]) for x in graveyard]
+            enemies = sample(graveyard, len(graveyard))
+            data = {"graveyard": graveyard, "enemies": enemies}
             exdata(data, id=self.id, game=True)
 
             gdata = imdata(self.id, game=True)
-            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            graveyard, enemies = gdata["graveyard"], gdata["enemies"]
             user = interaction.user
             embed = discord.Embed(
                 title=f"{user.display_name} ({user.name})'s afterlife :skull:" 
             ) 
-            battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+            battlefield = {"vessel": graveyard[0], "enemy": enemies[0]}
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
                 embed.add_field(
@@ -263,7 +263,7 @@ class afterlifestart(discord.ui.View):
                     + f":punch: {fighterobj['attack']}\n"
                     + f":heart: {fighterobj['health']}" 
                 ) 
-            gdata = {"cemetery": cemetery, "enemies": enemies}
+            gdata = {"graveyard": graveyard, "enemies": enemies}
             exdata(gdata, id=self.id, game=True)
             await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
 
@@ -272,12 +272,12 @@ class afterlifeview(discord.ui.View):
         super().__init__()
         self.id = id
 
-    def turn(self, cemetery, enemies, action = ""): 
+    def turn(self, graveyard, enemies, action = ""): 
         myact = ""
         data = imdata(id=self.id)
         num = 0
         if action == "attack":
-            attack = cemetery[0]["attack"]
+            attack = graveyard[0]["attack"]
             num = randint(attack-1, attack+1)
             enemies[0]["health"] -= num
             if enemies[0]["health"] <= 0:
@@ -285,23 +285,23 @@ class afterlifeview(discord.ui.View):
         elif action == "heal":
             healing = int(enemies[0]["attack"] / 2)
             num = randint(healing-1, healing+1)
-            cemetery[0]["health"] += num
+            graveyard[0]["health"] += num
         myact = f"{action}(s) for {num} :heart:"
         exdata(data, id=self.id, game=True)
-        return myact, cemetery, enemies
+        return myact, graveyard, enemies
 
     async def action(self, action, interaction):
         await interaction.response.defer()
         data = imdata(id=self.id, game=True)
         maing = imdata(id=self.id)
-        cemetery, enemies = data["cemetery"], data["enemies"]
+        graveyard, enemies = data["graveyard"], data["enemies"]
     
-        if [] in [cemetery, enemies]:
+        if [] in [graveyard, enemies]:
             title, description = "", ""
-            if [cemetery, enemies] == [[], []]:
+            if [graveyard, enemies] == [[], []]:
                 title = "it's a tie!"
                 description = f"oh well. at least you still got research points." 
-            elif cemetery == []:
+            elif graveyard == []:
                 title = "you lost."
                 description = f"oh well. at least you still got research points," 
             elif enemies == []:
@@ -310,30 +310,30 @@ class afterlifeview(discord.ui.View):
             await interaction.followup.send(embed=discord.Embed(
                 title=title, description=description
             )) 
-            exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
-            maing["cemetery"] = []
+            exdata({"graveyard": [], "enemies": []}, id=self.id, game=True)
+            maing["graveyard"] = []
             exdata(maing, id=self.id)
         else:
-            myact, cemetery, enemies = self.turn(
-                cemetery, enemies, 
+            myact, graveyard, enemies = self.turn(
+                graveyard, enemies, 
                 action=action
             )
-            youract, enemies, cemetery = self.turn(
-                enemies, cemetery, 
+            youract, enemies, graveyard = self.turn(
+                enemies, graveyard, 
                 action=choice(["attack", "heal"]
             )) 
 
             embed = discord.Embed(title=f"you {action}!", description="")
             desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
-            data = {"cemetery": cemetery, "enemies": enemies}
+            data = {"graveyard": graveyard, "enemies": enemies}
             for x in data:
                 if data[x][0]["health"] <= 0:
                     val = value(data[x][0]["genes"])
-                    desc += ("you" if x == "cemetery" else "an enemy") + f" died. "
-                    desc += (f"(and you got {val} research points!)" if x != "cemetery" else "") + "\n" 
+                    desc += ("you" if x == "graveyard" else "an enemy") + f" died. "
+                    desc += (f"(and you got {val} research points!)" if x != "graveyard" else "") + "\n" 
                     maing["currency"]["researchpoints"] += val
                     data[x] = data[x][1:]
-                    if x == "cemetery":
+                    if x == "graveyard":
                         maing[x] = maing[x][1:]
             exdata(maing, id=self.id)
             exdata(data, id=self.id, game=True)
@@ -341,19 +341,19 @@ class afterlifeview(discord.ui.View):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
             gdata = imdata(self.id, game=True)
-            cemetery, enemies = gdata["cemetery"], gdata["enemies"]
+            graveyard, enemies = gdata["graveyard"], gdata["enemies"]
             user = interaction.user
             embed = discord.Embed(
                 title=f"{user.display_name} ({user.name})'s afterlife :skull:"
             ) 
             try:
-                battlefield = {"vessel": cemetery[0], "enemy": enemies[0]}
+                battlefield = {"vessel": graveyard[0], "enemy": enemies[0]}
             except:
                 title, description = "", ""
-                if [cemetery, enemies] == [[], []]:
+                if [graveyard, enemies] == [[], []]:
                     title = "it's a tie!"
                     description = f"oh well. at least you still got research points." 
-                elif cemetery == []:
+                elif graveyard == []:
                     title = "you lost."
                     description = f"oh well. at least you still got research points," 
                 elif enemies == []:
@@ -362,7 +362,7 @@ class afterlifeview(discord.ui.View):
                 await interaction.followup.send(embed=discord.Embed(
                     title=title, description=description
                 ))
-                exdata({"cemetery": [], "enemies": []}, id=self.id, game=True)
+                exdata({"graveyard": [], "enemies": []}, id=self.id, game=True)
                 return
             for warrior in battlefield:
                 fighterobj = battlefield[warrior]
@@ -377,7 +377,7 @@ class afterlifeview(discord.ui.View):
             except:
                 msg = await interaction.followup.send(embed=embed, view=afterlifeview(self.id))
                 gamemsg[self.id] = msg
-            gdata = {"cemetery": cemetery, "enemies": enemies}
+            gdata = {"graveyard": graveyard, "enemies": enemies}
             exdata(gdata, id=self.id, game=True)
 
     @discord.ui.button(label="attack",style=discord.ButtonStyle.green)
@@ -429,7 +429,7 @@ class helpdropdown(discord.ui.Select):
                         "selection": "the amount of babies that can be synthesized at once is very limited. to allow for a better gene pool, you may be allowed to permanently shut down vessels with weaker genes to increase the general quality of your population's genes." 
                     },
                     "but what about the dormant vessels?\ndon't worry, you'll still get to see them": {
-                        "cemetery": "check out your dormant vessels! they are living a very peaceful life.",
+                        "graveyard": "check out your dormant vessels! they are living a very peaceful life.",
                         "afterlife minigame": "active vessels are VERY volatile. as such, research can only be conducted on the vessels in their 'afterlife', when they are dormant. the best way to do this is to obviously watch them fight! you will be taking control of a dormant vessel and be facing against an artificial enemy which can test their skills to the maximum." 
                     },
                     "what kind of currency is there in this game?\nthere are two main types:": {
@@ -456,7 +456,7 @@ class helpdropdown(discord.ui.Select):
                         "selection": "shut down all active vessels where both genes are a certain tier or below. only all vessels with both genes 5 tiers below your highest discovered gene or lower (e.g. discovering U unlocks selection for vessels with both slots Z and below)\nyou will get one research point per vessel killed.\n\n`gene`: all vessels with both genes with this tier or below will be killed." 
                     },
                     "the dormant vessels\nbecause we're not done with them yet!": {
-                        "cemetery": "just `/population` but for the dormant vessels.",
+                        "graveyard": "just `/population` but for the dormant vessels.",
                         "afterlife": "starts the afterlife minigame."
                     },
                     "misc\nupgrades and profiles!": {
@@ -517,7 +517,7 @@ def imdata(id=None, game=False):
             except:
                 data = initdata
                 exdata(data, id=id)
-                return data 
+                return data
     return data
 
 def exdata(ndata, id=None, game=False):
@@ -526,7 +526,7 @@ def exdata(ndata, id=None, game=False):
     if id:
         for x in ndata:
             if x in objects.keys():
-                if x in ["cemetery", "enemies"] and game:
+                if x in ["graveyard", "enemies"] and game:
                     ndata[x] = [[vars(p) if isinstance(p, objects[x]) else p for p in l] for l in ndata[x]]
                 else:
                     ndata[x] = [vars(p) if isinstance(p, objects[x]) else p for p in ndata[x]]
@@ -604,7 +604,7 @@ def autodie(id):
     else:
         for x in data["population"]:
             if get(x["deathtime"]) <= arrow.Arrow.now():
-                data["cemetery"].append(x)
+                data["graveyard"].append(x)
                 data["population"].remove(x)
         exdata(data, id=id) 
 
@@ -699,7 +699,7 @@ initdata = {
     ],
     "lastegg": arrow.Arrow.now(),
     "hatchery": [],
-    "cemetery": [],
+    "graveyard": [],
     "upgrades": {u: 0 for u in upgs.keys()},
     "profile": {
         "bio": "",
@@ -710,7 +710,7 @@ initdata = {
 objects = {
     "population": vessel,
     "hatchery": egg,
-    "cemetery": fighter,
+    "graveyard": fighter,
     "enemies": fighter
 }
 
