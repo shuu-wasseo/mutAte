@@ -62,7 +62,10 @@ class afterlifestart(discord.ui.View):
 
             game["graveyard"] = [[z for z in x if type(z) != list] for x in game["graveyard"]]
             avg = [[mini.value(z["genes"][y]) for x in game["graveyard"] for z in x] for y in range(2)]
-            avg = [mini.alpha[int(sum(x)/len(x))] for x in avg]
+            try:
+                avg = [mini.alpha[int(sum(x)/len(x))] for x in avg]
+            except:
+                avg = ["0"]
 
             #mx = maing["upgrades"]["ats1+"]
             mx = 5
@@ -96,7 +99,7 @@ class afterlifestart(discord.ui.View):
             embed = discord.Embed(title="what's after life?")
             embed.add_field(name="number of dormant vessels", value=len(graveyard))
             embed.add_field(name="average genes", value=''.join(avg))
-            embed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/graveyard_notext.png")
+            embed.set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/afterlife_notext.png")
             await interaction.response.send_message(embed=embed)
 
             game = {"graveyard": graveyard, "enemies": enemies}
@@ -204,7 +207,6 @@ class afterlifeview(discord.ui.View):
 
             embed = discord.Embed(title=f"you {action}!", description="")
             desc = "you " + myact + "\n" + "enemy " + youract + "\n\n"
-            gdata = maing 
             data = {"graveyard": graveyard, "enemies": enemies}
 
             for x in data:
@@ -213,7 +215,7 @@ class afterlifeview(discord.ui.View):
                 else:
                     health = sum(c["health"] for c in data[x][0])
                 if health <= 0:
-                    val = mini.value(data[x][0][0]["genes"]) * (gdata["upgrades"]["rp1+"] + 1)
+                    val = mini.value(data[x][0][0]["genes"]) * (maing["upgrades"]["rp1+"] + 1)
                     desc += ("you" if x == "graveyard" else "an enemy") + f" died. "
                     desc += (f"(and you got {val} research points!)" if x != "graveyard" else "") + "\n" 
                     maing["currency"]["researchpoints"] += val
@@ -382,6 +384,10 @@ async def hatchery(interaction):
 
     while len(hatchery) < limit + 1:
         parents = mini.parentsample(population)
+        try:
+            parents = [vars(p) for p in parents]
+        except:
+            pass
         genes = mini.newgenes(
             *[p["genes"] for p in parents],
             upgrade=data.upgrades["mc5+"]
@@ -652,8 +658,13 @@ async def graveyard(
                 value=f"parents: {', '.join([str(x) for x in p.parents])}" 
             ) 
     
-    if not full:
+    if not full and embeds:
         embeds = [embeds[0]]
+    elif not embeds:
+        embeds = [discord.Embed(
+            title=f"{interaction.user.display_name} ({interaction.user.name})'s graveyard :people_holding_hands:",
+            description="you have no dead people! not yet at least..."
+        )]
 
     embeds[-1].set_image(url="https://raw.githubusercontent.com/shuu-wasseo/mutAte/main/images/places/notext/graveyard_notext.png")
     await interaction.followup.send(embeds=embeds)
